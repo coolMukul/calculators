@@ -1,14 +1,17 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-AU">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Superannuation Projection Simulator (2026 - 2040)</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Superannuation Projection Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+            integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC"
+            crossorigin="anonymous"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
             --card-bg: #ffffff;
+            --card-inner: #f1f5f9;
             --primary: #2563eb;
             --primary-hover: #1d4ed8;
             --secondary: #059669;
@@ -25,26 +28,10 @@
             padding: 20px;
         }
 
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        header {
-            margin-bottom: 24px;
-        }
-
-        h1 {
-            font-size: 1.75rem;
-            margin: 0 0 6px 0;
-            color: var(--text-dark);
-        }
-
-        p.subtitle {
-            margin: 0;
-            color: var(--text-muted);
-            font-size: 0.95rem;
-        }
+        .container { max-width: 1100px; margin: 0 auto; }
+        header { margin-bottom: 24px; }
+        h1 { font-size: 1.75rem; margin: 0 0 6px 0; }
+        p.subtitle { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
 
         .grid {
             display: grid;
@@ -53,9 +40,7 @@
         }
 
         @media (max-width: 850px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
+            .grid { grid-template-columns: 1fr; }
         }
 
         .panel {
@@ -64,35 +49,65 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            min-width: 0;
         }
 
-        .control-group {
-            margin-bottom: 18px;
+        .control-group { margin-bottom: 18px; }
+        .control-group:last-child { margin-bottom: 0; }
+
+        details.input-section {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: var(--card-bg);
         }
+        details.input-section:last-child { margin-bottom: 0; }
+
+        details.input-section > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            border-radius: 8px;
+            position: relative;
+            padding-right: 36px;
+        }
+        details.input-section > summary::-webkit-details-marker { display: none; }
+        details.input-section > summary::after {
+            content: '';
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            width: 8px;
+            height: 8px;
+            border-right: 2px solid var(--text-muted);
+            border-bottom: 2px solid var(--text-muted);
+            transform: translateY(-70%) rotate(45deg);
+            transition: transform 0.15s ease;
+        }
+        details.input-section[open] > summary::after { transform: translateY(-30%) rotate(-135deg); }
+        details.input-section > summary:hover { background: var(--card-inner); }
+        details.input-section > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        .section-title { font-size: 0.95rem; font-weight: 700; }
+        .section-summary { font-size: 0.78rem; color: var(--text-muted); }
+        .section-body { padding: 4px 14px 16px; }
 
         .control-label {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            display: block;
             font-size: 0.875rem;
             font-weight: 600;
             margin-bottom: 6px;
         }
 
-        .input-row {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
+        .input-row { display: flex; gap: 10px; align-items: center; }
 
-        input[type="range"] {
-            flex: 1;
-            accent-color: var(--primary);
-            cursor: pointer;
-        }
+        input[type="range"] { flex: 1; accent-color: var(--primary); cursor: pointer; min-width: 0; }
 
         input[type="number"] {
-            width: 90px;
+            width: 100px;
             padding: 6px 8px;
             border: 1px solid var(--border);
             border-radius: 6px;
@@ -101,9 +116,9 @@
             font-family: inherit;
         }
 
-        input[type="number"]:focus {
+        input:focus-visible, button:focus-visible {
             outline: 2px solid var(--primary);
-            border-color: transparent;
+            outline-offset: 2px;
         }
 
         .header-actions {
@@ -112,6 +127,8 @@
             align-items: center;
             margin-bottom: 16px;
         }
+
+        .header-actions h2 { margin: 0; font-size: 1.1rem; }
 
         .btn-export {
             background-color: var(--primary);
@@ -125,9 +142,26 @@
             transition: background-color 0.2s ease;
         }
 
-        .btn-export:hover {
-            background-color: var(--primary-hover);
+        .btn-export:hover { background-color: var(--primary-hover); }
+
+        .header-buttons { display: flex; gap: 8px; }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
         }
+
+        .btn-secondary:hover { background-color: var(--card-inner); }
+
+        .import-status { font-size: 0.85rem; margin: -8px 0 12px; color: var(--text-muted); }
+        .import-status:empty { display: none; }
+        .import-status.error { color: #b91c1c; }
 
         .summary-cards {
             display: grid;
@@ -136,11 +170,7 @@
             margin-bottom: 20px;
         }
 
-        .card {
-            background: #f1f5f9;
-            border-radius: 8px;
-            padding: 12px 16px;
-        }
+        .card { background: var(--card-inner); border-radius: 8px; padding: 12px 16px; }
 
         .card-label {
             font-size: 0.75rem;
@@ -151,31 +181,75 @@
             font-weight: 600;
         }
 
-        .card-value {
-            font-size: 1.25rem;
-            font-weight: 700;
+        .card-value { font-size: 1.25rem; font-weight: 700; }
+        .card-value.highlight { color: var(--primary); }
+        .card-value.real { color: var(--secondary); }
+
+        .chart-select-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .chart-select-row label { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); }
+
+        select {
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-family: inherit;
+            background: #ffffff;
             color: var(--text-dark);
+            max-width: 100%;
+        }
+        select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        .chart-container { position: relative; height: 400px; width: 100%; }
+        .chart-container[hidden] { display: none; }
+
+        .warnings { margin-bottom: 16px; }
+        .warnings:empty { display: none; }
+        .warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+            line-height: 1.4;
         }
 
-        .card-value.highlight {
-            color: var(--primary);
-        }
+        .warning.note { background: #e0f2fe; color: #075985; border-left-color: #0ea5e9; }
 
-        .card-value.real {
-            color: var(--secondary);
+        .disclaimer {
+            background: #fff7ed;
+            border: 1px solid #fdba74;
+            border-left: 4px solid #ea580c;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
+        .disclaimer strong { display: block; margin-bottom: 4px; }
+        .disclaimer p { margin: 0 0 6px; }
+        .disclaimer p:last-child { margin-bottom: 0; }
 
-        .chart-container {
-            position: relative;
-            height: 400px;
-            width: 100%;
+        details.assumptions {
+            margin-top: 20px;
+            background: var(--card-inner);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.875rem;
+            line-height: 1.5;
         }
+        details.assumptions summary { cursor: pointer; font-weight: 600; }
+        details.assumptions h3 { font-size: 0.9rem; margin: 14px 0 4px; }
+        details.assumptions ul { margin: 0; padding-left: 20px; }
 
         footer {
             margin-top: 20px;
             font-size: 0.8rem;
             color: var(--text-muted);
             text-align: center;
+            line-height: 1.5;
         }
     </style>
 </head>
@@ -184,343 +258,801 @@
 <div class="container">
     <header>
         <h1>Superannuation Projection Simulator</h1>
-        <p class="subtitle">Forecast balance trajectory from 2026 to 2040 with inflation and deduction modeling.</p>
+        <p class="subtitle" id="subtitle"></p>
     </header>
 
+    <section class="disclaimer" aria-label="Important information">
+        <strong>Important information</strong>
+        <p>This calculator is an educational tool. It gives an illustration of how a super balance could grow
+        under the assumptions shown, based on the figures you enter. It is not a forecast, and your actual
+        result will differ.</p>
+        <p>It is not intended to be relied on for making a decision about a financial product. It does not take
+        your personal circumstances into account. Consider getting advice from a financial adviser
+        (an Australian financial services licensee) before making any financial decisions.</p>
+        <p>Balances are shown in future dollars and also in today's dollars, which allow for inflation. Results rely on
+        the assumptions and limitations listed under <em>Assumptions &amp; limitations</em> below.</p>
+    </section>
+
     <div class="grid">
-        <!-- Controls Panel -->
-        <div class="panel">
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Start Year</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="startYearSlider" min="2024" max="2030" step="1" value="2026">
-                    <input type="number" id="startYearNum" min="2024" max="2030" step="1" value="2026">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Starting Balance ($)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="initialSlider" min="0" max="500000" step="1000" value="145345.32">
-                    <input type="number" id="initialNum" min="0" max="500000" step="100" value="145345.32">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Monthly Contribution ($)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="monthlySlider" min="0" max="10000" step="50" value="2210.60">
-                    <input type="number" id="monthlyNum" min="0" max="10000" step="10" value="2210.60">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Contribution Duration (Years)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="contribYearsSlider" min="0" max="14" step="1" value="14">
-                    <input type="number" id="contribYearsNum" min="0" max="14" step="1" value="14">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Gross Growth Rate (% p.a.)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="grossRateSlider" min="0" max="15" step="0.1" value="6.0">
-                    <input type="number" id="grossRateNum" min="0" max="15" step="0.1" value="6.0">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Annual Deductions (% p.a.)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="deductionsSlider" min="0" max="5" step="0.1" value="0.5">
-                    <input type="number" id="deductionsNum" min="0" max="5" step="0.1" value="0.5">
-                </div>
-            </div>
-
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Annual Inflation Rate (% p.a.)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="inflationSlider" min="0" max="8" step="0.1" value="2.5">
-                    <input type="number" id="inflationNum" min="0" max="8" step="0.1" value="2.5">
-                </div>
-            </div>
-        </div>
+        <!-- Controls Panel (generated from CONTROLS below) -->
+        <div class="panel" id="controlsPanel"></div>
 
         <!-- Output Panel -->
         <div class="panel">
             <div class="header-actions">
-                <h3 style="margin: 0; font-size: 1.1rem;">Projection Overview</h3>
-                <button class="btn-export" id="btnExportJson">Download JSON</button>
+                <h2>Projection Overview</h2>
+                <div class="header-buttons">
+                    <button type="button" class="btn-secondary" id="btnImportJson">Import JSON</button>
+                    <button type="button" class="btn-export" id="btnExportJson">Download JSON</button>
+                    <input type="file" id="fileImportJson" accept=".json,application/json" hidden>
+                </div>
             </div>
+
+            <div class="import-status" id="importStatus" role="status"></div>
+
+            <div class="warnings" id="warnings" role="status"></div>
 
             <div class="summary-cards">
                 <div class="card">
-                    <div class="card-label">Target Year (Age 60)</div>
-                    <div class="card-value">2040</div>
+                    <div class="card-label" id="lblTarget"></div>
+                    <div class="card-value" id="cardTarget"></div>
                 </div>
                 <div class="card">
                     <div class="card-label">Effective Net Return</div>
                     <div class="card-value" id="cardNetRate">5.50%</div>
                 </div>
                 <div class="card">
-                    <div class="card-label">Nominal Balance (2040)</div>
+                    <div class="card-label" id="lblNominal"></div>
                     <div class="card-value highlight" id="cardNominal">$0</div>
                 </div>
                 <div class="card">
                     <div class="card-label">Real Value (Today's $)</div>
                     <div class="card-value real" id="cardReal">$0</div>
                 </div>
+                <div class="card">
+                    <div class="card-label">Total Contributed (After Tax)</div>
+                    <div class="card-value" id="cardContrib">$0</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Contributions Tax Paid</div>
+                    <div class="card-value" id="cardTax">$0</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Government Support</div>
+                    <div class="card-value" id="cardGovt">$0</div>
+                </div>
+                <div class="card">
+                    <div class="card-label">Growth Earned (Nominal)</div>
+                    <div class="card-value" id="cardGrowth">$0</div>
+                </div>
+                <div class="card">
+                    <div class="card-label" id="lblIncome"></div>
+                    <div class="card-value real" id="cardIncome">$0</div>
+                </div>
             </div>
 
-            <div class="chart-container">
-                <canvas id="projectionChart"></canvas>
+            <div class="chart-select-row">
+                <label for="chartSelect">Chart</label>
+                <select id="chartSelect"></select>
             </div>
+
+            <!-- One container per chart, created on first selection (see CHART_VIEWS) -->
+            <div id="chartHost"></div>
         </div>
     </div>
 
+    <details class="assumptions" id="assumptions">
+        <summary>Assumptions &amp; limitations</summary>
+        <div id="assumptionsBody"></div>
+    </details>
+
     <footer>
-        * Projections calculate monthly compounding based on starting balance and ongoing contribution inputs.
+        * Illustrative only, not financial advice. Monthly compounding; contributions are added at the end of each month.
+        Employer (Super Guarantee) and salary sacrifice contributions are concessional: taxed at 15% on entry, or 30% on the part
+        above the Division 293 income threshold. Amounts over the contribution caps are excluded. Caps and thresholds are held
+        constant (not indexed). The low income super tax offset and government co-contribution use gross salary as the income test, with 2026-27 thresholds held constant.
+        Illustrative income is the real retirement balance drawn down at a fixed annual rate. Net return = gross growth rate minus annual deductions (fees and earnings tax), applied as a nominal
+        annual rate. Real value is discounted by annual inflation. Amounts are in Australian dollars (AUD).
     </footer>
 </div>
 
 <script>
-    // Input Control Definitions
-    const controls = [
-        { id: 'startYear', slider: 'startYearSlider', num: 'startYearNum' },
-        { id: 'initial', slider: 'initialSlider', num: 'initialNum' },
-        { id: 'monthly', slider: 'monthlySlider', num: 'monthlyNum' },
-        { id: 'contribYears', slider: 'contribYearsSlider', num: 'contribYearsNum' },
-        { id: 'grossRate', slider: 'grossRateSlider', num: 'grossRateNum' },
-        { id: 'deductions', slider: 'deductionsSlider', num: 'deductionsNum' },
-        { id: 'inflation', slider: 'inflationSlider', num: 'inflationNum' }
+    // ---- Australian super rules (held constant across the projection; update each 1 July) ----
+    const CONCESSIONAL_CAP     = 30000;    // employer SG + salary sacrifice + personal deductible, per year
+    const NON_CONCESSIONAL_CAP = 120000;   // after-tax contributions, per year
+    const MAX_SG_BASE          = 250000;   // annual salary above this attracts no employer SG (max contribution base)
+    const CONTRIBUTIONS_TAX    = 0.15;     // tax on concessional contributions entering the fund
+    const DIV293_THRESHOLD     = 250000;   // income + concessional contributions above this: extra tax applies
+    const DIV293_EXTRA_TAX     = 0.15;     // additional 15% (30% total) on the portion above the threshold
+    const PRESERVATION_AGE     = 60;       // earliest age super is generally accessible without a condition of release
+
+    // Government support for lower incomes (2026-27 figures, held flat like the rest)
+    const COCONTRIB_MAX        = 500;      // maximum government co-contribution per year
+    const COCONTRIB_MATCH      = 0.5;      // 50c per $1 of personal after-tax contribution
+    const COCONTRIB_LOWER      = 49293;    // full entitlement at or below this total income
+    const COCONTRIB_HIGHER     = 64293;    // no entitlement at or above this total income
+    const COCONTRIB_MAX_AGE    = 70;       // must be under 71 at the end of the year
+    const LISTO_THRESHOLD      = 37000;    // low income super tax offset: adjusted taxable income at or below this
+    const LISTO_RATE           = 0.15;     // refund of 15% of concessional contributions
+    const LISTO_MAX            = 500;
+
+    const RATES_AS_AT          = '2026-27';   // financial year the cap, threshold and tax figures above are taken from
+
+    const DRAWDOWN_RATE        = 0.04;     // illustrative annual drawdown used for the retirement income card
+    const SCENARIO_SPREAD      = 2;        // percentage points either side of the gross growth rate
+
+    const MIN_START_YEAR = 2024;
+    const MAX_START_YEAR = 2030;
+
+    // ---- Accordion sections: each control names its section in "group" ----
+    const GROUPS = [
+        { id: 'timeline',      title: 'Timeline' },
+        { id: 'contributions', title: 'Contributions' },
+        { id: 'investment',    title: 'Investment & Economy' }
     ];
 
-    // Global variable to store current simulation output for JSON export
-    let latestSimulationData = null;
+    // ---- Control definitions: min/max are hard limits, sliderStep is coarser than the number input ----
+    const CONTROLS = [
+        { id: 'startYear', group: 'timeline',    label: 'Start Year',                       min: MIN_START_YEAR, max: MAX_START_YEAR, step: 1,   value: 2026, int: true },
+        { id: 'startAge', group: 'timeline',     label: 'Age at Start Year',                min: 18, max: 70, step: 1, value: 35, int: true },
+        { id: 'retireAge', group: 'timeline',    label: 'Retirement Age',                   min: 55, max: 75, step: 1, value: 67, int: true },
+        { id: 'initial', group: 'contributions',      label: 'Starting Balance ($)',             min: 0, max: 500000, step: 100, sliderStep: 1000, value: 100000 },
+        { id: 'salary', group: 'contributions',       label: 'Annual Salary ($)',                min: 0, max: 500000, step: 1000, sliderStep: 1000, value: 100000 },
+        { id: 'salaryGrowth', group: 'contributions', label: 'Salary Growth (% p.a.)',           min: 0, max: 10,     step: 0.1, value: 3.0 },
+        { id: 'sgRate', group: 'contributions',       label: 'Employer Super Guarantee (%)',     min: 0, max: 20,     step: 0.5, value: 12 },
+        { id: 'salarySac', group: 'contributions',    label: 'Salary Sacrifice ($ p.a., pre-tax)', min: 0, max: 60000, step: 100, sliderStep: 500,  value: 0 },
+        { id: 'afterTax', group: 'contributions',     label: 'After-Tax Contributions ($ p.a.)', min: 0, max: 200000, step: 100, sliderStep: 1000, value: 0 },
+        { id: 'contribYears', group: 'timeline', label: 'Contribution Duration (Years)',    min: 0, max: 35,     step: 1,   value: 32, int: true },
+        { id: 'grossRate', group: 'investment',    label: 'Gross Growth Rate (% p.a.)',       min: 0, max: 15,     step: 0.1, value: 7.0 },
+        { id: 'deductions', group: 'investment',   label: 'Fees & Earnings Tax (% p.a.)',     min: 0, max: 5,      step: 0.1, value: 1.5 },
+        { id: 'inflation', group: 'investment',    label: 'Annual Inflation Rate (% p.a.)',   min: 0, max: 8,      step: 0.1, value: 2.5 }
+    ];
 
-    // Chart Setup
-    const ctx = document.getElementById('projectionChart').getContext('2d');
-    let chart = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
-                    label: 'Nominal Balance ($)',
-                    data: [],
-                    borderColor: '#2563eb',
-                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                    fill: true,
-                    tension: 0.2
-                },
-                {
-                    label: "Real Purchasing Power (Today's $)",
-                    data: [],
-                    borderColor: '#059669',
-                    borderDash: [5, 5],
-                    backgroundColor: 'transparent',
-                    fill: false,
-                    tension: 0.2
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
-                            }
-                            return label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    title: { display: true, text: 'Calendar Year' }
-                },
-                y: {
-                    title: { display: true, text: 'Balance ($)' },
-                    ticks: {
-                        callback: function(value) {
-                            return '$' + (value / 1000).toFixed(0) + 'k';
-                        }
-                    }
-                }
-            }
-        }
+    const currencyFmt = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 });
+    const currencyFmtCents = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
+    const formatCurrency = v => currencyFmt.format(v);
+
+    const round2 = v => Math.round(v * 100) / 100;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+
+    // ---- Build controls ----
+    const els = {};
+    const panel = document.getElementById('controlsPanel');
+    const sectionEls = {};   // group id -> { details, summaryText }
+    GROUPS.forEach((g, i) => {
+        const details = document.createElement('details');
+        details.className = 'input-section';
+        details.name = 'inputSections';   // browsers that support it keep one section open at a time
+        details.open = i === 0;
+
+        const summary = document.createElement('summary');
+        const title = document.createElement('span');
+        title.className = 'section-title';
+        title.textContent = g.title;
+        const summaryText = document.createElement('span');
+        summaryText.className = 'section-summary';
+        summary.appendChild(title);
+        summary.appendChild(summaryText);
+
+        const body = document.createElement('div');
+        body.className = 'section-body';
+
+        details.appendChild(summary);
+        details.appendChild(body);
+        panel.appendChild(details);
+        sectionEls[g.id] = { details, summaryText, body };
     });
 
-    function formatCurrency(val) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+    CONTROLS.forEach(c => {
+        const group = document.createElement('div');
+        group.className = 'control-group';
+        group.innerHTML = `
+            <label class="control-label" for="${c.id}Num">${c.label}</label>
+            <div class="input-row">
+                <input type="range" id="${c.id}Slider" aria-label="${c.label} slider"
+                       min="${c.min}" max="${c.max}" step="${c.sliderStep || c.step}" value="${c.value}">
+                <input type="number" id="${c.id}Num" inputmode="decimal"
+                       min="${c.min}" max="${c.max}" step="${c.step}" value="${c.value}">
+            </div>`;
+        sectionEls[c.group].body.appendChild(group);
+        els[c.id] = {
+            def: c,
+            slider: group.querySelector('input[type="range"]'),
+            num: group.querySelector('input[type="number"]')
+        };
+    });
+
+    // Read a control as a clamped number (empty/invalid text falls back to the minimum).
+    function readValue(id) {
+        const { def, num } = els[id];
+        let v = def.int ? parseInt(num.value, 10) : parseFloat(num.value);
+        if (!Number.isFinite(v)) v = def.min;
+        return clamp(v, def.min, Number(num.max));
     }
 
-    function calculate() {
-        const startYear = parseInt(document.getElementById('startYearNum').value) || 2026;
-        const initial = parseFloat(document.getElementById('initialNum').value) || 0;
-        const monthly = parseFloat(document.getElementById('monthlyNum').value) || 0;
-        const contribYears = parseInt(document.getElementById('contribYearsNum').value) || 0;
-        const grossRate = parseFloat(document.getElementById('grossRateNum').value) || 0;
-        const deductions = parseFloat(document.getElementById('deductionsNum').value) || 0;
-        const inflation = parseFloat(document.getElementById('inflationNum').value) || 0;
+    // One-line recap shown under each section title so collapsed sections still show their values.
+    function updateSectionSummaries(inp, netRatePct) {
+        const pct = v => `${Number(v.toFixed(1))}%`;
+        const text = {
+            timeline:      `${inp.startYear} · age ${inp.startAge} to ${inp.retireAge} · contribute ${inp.contribYears} yrs`,
+            contributions: `${formatCurrency(inp.initial)} balance · ${formatCurrency(inp.salary)} salary · SG ${pct(inp.sgRate * 100)}`,
+            investment:    `${pct(inp.grossRate)} gross · ${pct(netRatePct)} net · ${pct(inp.inflation)} inflation`
+        };
+        GROUPS.forEach(g => { sectionEls[g.id].summaryText.textContent = text[g.id]; });
+    }
 
-        const targetYear = 2040;
-        const totalYears = Math.max(0, targetYear - startYear);
-        const netRatePct = grossRate - deductions;
-        const monthlyNetRate = (netRatePct / 100) / 12;
-        const monthlyInflation = (inflation / 100);
+    // Effective retirement age: never at or before the start age (the field itself is left alone while typing).
+    const effectiveRetireAge = () => Math.max(readValue('retireAge'), readValue('startAge') + 1);
 
-        const labels = [];
-        const nominalData = [];
-        const realData = [];
-        const projectionTable = [];
+    // Contribution duration can never exceed the projection horizon.
+    function syncLimits() {
+        const minRetire = Math.max(els.retireAge.def.min, readValue('startAge') + 1);
+        els.retireAge.slider.min = els.retireAge.num.min = minRetire;
 
-        for (let yr = 0; yr <= totalYears; yr++) {
-            const currentYear = startYear + yr;
-            const currentAge = 46 + yr;
-            labels.push(currentYear.toString());
-
-            let nominal = 0;
-            const monthsPassed = yr * 12;
-            const isContributing = yr < contribYears;
-            const activeContribMonths = Math.min(monthsPassed, contribYears * 12);
-
-            if (monthsPassed <= contribYears * 12) {
-                // Contributing phase
-                if (monthlyNetRate > 0) {
-                    nominal = initial * Math.pow(1 + monthlyNetRate, monthsPassed) + 
-                              monthly * ((Math.pow(1 + monthlyNetRate, monthsPassed) - 1) / monthlyNetRate);
-                } else {
-                    nominal = initial + monthly * monthsPassed;
-                }
-            } else {
-                // Growth only phase
-                const contribMonths = contribYears * 12;
-                let balanceAtStop = 0;
-                if (monthlyNetRate > 0) {
-                    balanceAtStop = initial * Math.pow(1 + monthlyNetRate, contribMonths) + 
-                                   monthly * ((Math.pow(1 + monthlyNetRate, contribMonths) - 1) / monthlyNetRate);
-                } else {
-                    balanceAtStop = initial + monthly * contribMonths;
-                }
-                const remainingMonths = monthsPassed - contribMonths;
-                nominal = balanceAtStop * Math.pow(1 + monthlyNetRate, remainingMonths);
-            }
-
-            const real = nominal / Math.pow(1 + monthlyInflation, yr);
-            const cumulativeContributions = initial + (monthly * activeContribMonths);
-
-            nominalData.push(nominal);
-            realData.push(real);
-
-            projectionTable.push({
-                year: currentYear,
-                age: currentAge,
-                isContributing: isContributing || (yr === contribYears && contribYears > 0),
-                totalContributionsAdded: Math.round(cumulativeContributions * 100) / 100,
-                nominalBalance: Math.round(nominal * 100) / 100,
-                realPurchasingPower: Math.round(real * 100) / 100
-            });
+        const horizon = effectiveRetireAge() - readValue('startAge');
+        const { slider, num } = els.contribYears;
+        slider.max = num.max = horizon;
+        if (Number(num.value) > horizon) {
+            num.value = slider.value = horizon;
         }
+    }
 
-        // Update UI
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = nominalData;
-        chart.data.datasets[1].data = realData;
-        chart.update();
-
-        const finalNominal = nominalData[nominalData.length - 1] || 0;
-        const finalReal = realData[realData.length - 1] || 0;
-
-        document.getElementById('cardNetRate').textContent = netRatePct.toFixed(2) + '%';
-        document.getElementById('cardNominal').textContent = formatCurrency(finalNominal);
-        document.getElementById('cardReal').textContent = formatCurrency(finalReal);
-
-        // Store data structure for export
-        latestSimulationData = {
-            metadata: {
-                title: "Superannuation Projection Report",
-                generatedDate: new Date().toISOString().split('T')[0],
-                targetYear: targetYear,
-                targetAge: 60
-            },
-            inputParameters: {
-                startYear: startYear,
-                startingBalance: initial,
-                monthlyContribution: monthly,
-                contributionDurationYears: contribYears,
-                grossGrowthRatePercent: grossRate,
-                annualDeductionsPercent: deductions,
-                effectiveNetReturnPercent: Math.round(netRatePct * 100) / 100,
-                annualInflationRatePercent: inflation
-            },
-            summaryResults: {
-                nominalBalance2040: Math.round(finalNominal * 100) / 100,
-                realPurchasingPower2040: Math.round(finalReal * 100) / 100
-            },
-            yearlyProjections: projectionTable
+    // ---- Simulation ----
+    function readInputs() {
+        const startAge = readValue('startAge');
+        return {
+            startYear:    readValue('startYear'),
+            startAge,
+            retireAge:    effectiveRetireAge(),
+            initial:      readValue('initial'),
+            salary:       readValue('salary'),
+            salaryGrowth: readValue('salaryGrowth') / 100,
+            sgRate:       readValue('sgRate') / 100,
+            salarySac:    readValue('salarySac'),
+            afterTax:     readValue('afterTax'),
+            contribYears: readValue('contribYears'),
+            grossRate:    readValue('grossRate'),
+            deductions:   readValue('deductions'),
+            inflation:    readValue('inflation')
         };
     }
 
-    // Function to trigger JSON download
-    function exportToJson() {
-        if (!latestSimulationData) return;
-        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(latestSimulationData, null, 2));
-        const downloadAnchor = document.createElement('a');
-        const filename = `super_projection_${latestSimulationData.inputParameters.startYear}_to_2040.json`;
-        
-        downloadAnchor.setAttribute("href", dataStr);
-        downloadAnchor.setAttribute("download", filename);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
+    // Pure year-by-year projection. grossRate is a parameter so scenario charts can re-run it at other rates.
+    function simulate(inp, grossRate) {
+        const totalYears = inp.retireAge - inp.startAge;
+        const netRatePct = grossRate - inp.deductions;
+        const monthlyRate = netRatePct / 100 / 12;   // may be negative if deductions > gross
+        const annualInflation = inp.inflation / 100;
+
+        const labels = [], nominal = [], real = [], contrib = [], rows = [];
+        let balance = inp.initial;
+        let contributed = inp.initial;
+        let taxPaid = 0;
+        let govtTotal = 0;
+        const flags = { concExcessYear: null, afterTaxExcessYear: null, div293Year: null, listoYears: [], coConYears: [] };
+
+        for (let yr = 0; yr <= totalYears; yr++) {
+            const year = inp.startYear + yr;
+            const age = inp.startAge + yr;
+            const row = { salary: 0, concessional: 0, afterTax: 0, tax: 0, listo: 0, coCon: 0, net: 0 };
+
+            if (yr > 0) {
+                // Contributions for this year, worked out once and paid in 12 equal monthly instalments.
+                if (yr <= inp.contribYears) {
+                    row.salary = inp.salary * Math.pow(1 + inp.salaryGrowth, yr - 1);
+                    const sg  = Math.min(row.salary, MAX_SG_BASE) * inp.sgRate;
+                    const sac = Math.min(inp.salarySac, row.salary);
+                    const concWanted = sg + sac;
+                    row.concessional = Math.min(concWanted, CONCESSIONAL_CAP);   // employer SG takes priority, excess is dropped
+                    row.afterTax = Math.min(inp.afterTax, NON_CONCESSIONAL_CAP);
+
+                    // Division 293 income = taxable income (after salary sacrifice) + concessional contributions.
+                    const div293Income = row.salary - sac + row.concessional;
+                    const div293Portion = clamp(div293Income - DIV293_THRESHOLD, 0, row.concessional);
+                    row.tax = row.concessional * CONTRIBUTIONS_TAX + div293Portion * DIV293_EXTRA_TAX;
+
+                    // Low income super tax offset refunds contributions tax. Income tests use gross salary,
+                    // because salary sacrifice is added back as a reportable employer contribution.
+                    if (row.salary <= LISTO_THRESHOLD) {
+                        row.listo = Math.min(LISTO_MAX, row.concessional * LISTO_RATE);
+                        row.tax -= row.listo;
+                        if (row.listo > 0) flags.listoYears.push(year);
+                    }
+
+                    // Government co-contribution matches personal after-tax contributions, phasing out
+                    // by 1/30 of a dollar (500 over the 15,000 income band) per dollar above the lower threshold.
+                    if (age <= COCONTRIB_MAX_AGE && row.salary > 0 && row.salary < COCONTRIB_HIGHER) {
+                        const maxEntitlement = COCONTRIB_MAX * (COCONTRIB_HIGHER - Math.max(row.salary, COCONTRIB_LOWER))
+                            / (COCONTRIB_HIGHER - COCONTRIB_LOWER);
+                        row.coCon = Math.min(row.afterTax * COCONTRIB_MATCH, maxEntitlement);
+                        if (row.coCon > 0) flags.coConYears.push(year);
+                    }
+
+                    row.net = row.concessional - row.tax + row.afterTax + row.coCon;
+
+                    if (concWanted > CONCESSIONAL_CAP && flags.concExcessYear === null) flags.concExcessYear = year;
+                    if (inp.afterTax > NON_CONCESSIONAL_CAP && flags.afterTaxExcessYear === null) flags.afterTaxExcessYear = year;
+                    if (div293Portion > 0 && flags.div293Year === null) flags.div293Year = year;
+                }
+
+                const monthlyAdd = row.net / 12;
+                for (let m = 0; m < 12; m++) {
+                    balance *= 1 + monthlyRate;
+                    balance += monthlyAdd;
+                }
+                contributed += row.net;
+                taxPaid += row.tax;
+                govtTotal += row.coCon + row.listo;
+            }
+
+            const realValue = balance / Math.pow(1 + annualInflation, yr);
+
+            labels.push([String(year), 'Age ' + age]);
+            nominal.push(balance);
+            real.push(realValue);
+            contrib.push(contributed);
+            rows.push({ year, age, yr, ...row, contributed, balance, real: realValue });
+        }
+
+        return { labels, nominal, real, contrib, rows, taxPaid, govtTotal, flags, netRatePct, totalYears };
     }
 
-    // Bind two-way synchronization between sliders and number inputs
-    controls.forEach(ctrl => {
-        const sliderEl = document.getElementById(ctrl.slider);
-        const numEl = document.getElementById(ctrl.num);
+    // ---- Charts: one view per dropdown entry, each built lazily the first time it is selected ----
+    const moneyTick = v => Math.abs(v) >= 1e6 ? '$' + (v / 1e6).toFixed(1) + 'M' : '$' + Math.round(v / 1000) + 'k';
+    const moneyLabel = ctx => {
+        const y = ctx.raw !== undefined && ctx.raw !== null && typeof ctx.raw === 'number' ? ctx.raw : ctx.parsed.y;
+        return `${ctx.dataset.label}: ${y === null ? '' : currencyFmtCents.format(y)}`;
+    };
 
-        sliderEl.addEventListener('input', () => {
-            numEl.value = sliderEl.value;
+    function chartOptions(xTitle, yTitle, extraScales) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom' },
+                tooltip: { callbacks: { label: moneyLabel } }
+            },
+            scales: {
+                x: { title: { display: true, text: xTitle }, ...(extraScales && extraScales.x) },
+                y: { beginAtZero: true, title: { display: true, text: yTitle }, ticks: { callback: moneyTick }, ...(extraScales && extraScales.y) }
+            }
+        };
+    }
+
+    const CHART_VIEWS = {
+        balance: {
+            title: 'Balance projection',
+            aria: 'Line chart of projected superannuation balance by year: nominal balance, real purchasing power, and total contributed',
+            create: canvas => new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Nominal Balance ($)', data: [], borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.2 },
+                        { label: "Real Purchasing Power (Today's $)", data: [], borderColor: '#059669', borderDash: [5, 5], backgroundColor: 'transparent', fill: false, tension: 0.2 },
+                        { label: 'Total Contributed, After Tax ($)', data: [], borderColor: '#94a3b8', borderWidth: 1.5, pointRadius: 0, backgroundColor: 'transparent', fill: false }
+                    ]
+                },
+                options: chartOptions('Year (Age)', 'Balance ($)')
+            }),
+            update(chart, sim) {
+                chart.data.labels = sim.labels;
+                chart.data.datasets[0].data = sim.nominal;
+                chart.data.datasets[1].data = sim.real;
+                chart.data.datasets[2].data = sim.contrib;
+            }
+        },
+
+        breakdown: {
+            title: 'Balance breakdown',
+            aria: 'Stacked area chart splitting the projected balance into the starting balance, after-tax contributions, and investment growth',
+            create: canvas => new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Starting Balance ($)', data: [], borderColor: '#94a3b8', backgroundColor: 'rgba(148, 163, 184, 0.45)', fill: 'origin', pointRadius: 0 },
+                        { label: 'Contributions, After Tax ($)', data: [], borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.35)', fill: '-1', pointRadius: 0 },
+                        { label: 'Investment Growth ($)', data: [], borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.35)', fill: '-1', pointRadius: 0 }
+                    ]
+                },
+                options: chartOptions('Year (Age)', 'Balance ($)', { y: { stacked: true } })
+            }),
+            update(chart, sim, inp) {
+                chart.data.labels = sim.labels;
+                chart.data.datasets[0].data = sim.labels.map(() => inp.initial);
+                chart.data.datasets[1].data = sim.contrib.map(c => c - inp.initial);
+                chart.data.datasets[2].data = sim.nominal.map((b, k) => b - sim.contrib[k]);
+            }
+        },
+
+        contributions: {
+            title: 'Yearly contributions',
+            aria: 'Bar chart of contributions each year: concessional contributions after tax, contributions tax, after-tax contributions, government co-contributions, and the concessional cap',
+            create: canvas => new Chart(canvas, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Concessional, Net to Fund ($)', data: [], backgroundColor: '#2563eb', stack: 'concessional' },
+                        { label: 'Contributions Tax ($)', data: [], backgroundColor: '#dc2626', stack: 'concessional' },
+                        { label: 'After-Tax Contributions ($)', data: [], backgroundColor: '#059669', stack: 'afterTax' },
+                        { label: 'Government Co-Contribution ($)', data: [], backgroundColor: '#7c3aed', stack: 'afterTax' },
+                        { type: 'line', label: 'Concessional Cap ($)', data: [], borderColor: '#f59e0b', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
+                    ]
+                },
+                options: chartOptions('Year (Age)', 'Contributions ($)', { x: { stacked: true }, y: { stacked: true } })
+            }),
+            update(chart, sim) {
+                const rows = sim.rows.slice(1);   // the first row is the opening position, not a contribution year
+                chart.data.labels = rows.map(r => r.year + ' (' + r.age + ')');
+                chart.data.datasets[0].data = rows.map(r => round2(r.concessional - r.tax));
+                chart.data.datasets[1].data = rows.map(r => round2(r.tax));
+                chart.data.datasets[2].data = rows.map(r => round2(r.afterTax));
+                chart.data.datasets[3].data = rows.map(r => round2(r.coCon));
+                chart.data.datasets[4].data = rows.map(() => CONCESSIONAL_CAP);
+            }
+        },
+
+        scenarios: {
+            title: `Return scenarios (±${SCENARIO_SPREAD}%)`,
+            aria: 'Line chart comparing the projected nominal balance under lower, base and higher gross growth rates',
+            create: canvas => new Chart(canvas, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: '', data: [], borderColor: '#dc2626', backgroundColor: 'transparent', borderDash: [5, 5], pointRadius: 0, tension: 0.2 },
+                        { label: '', data: [], borderColor: '#2563eb', backgroundColor: 'transparent', pointRadius: 0, tension: 0.2 },
+                        { label: '', data: [], borderColor: '#059669', backgroundColor: 'transparent', borderDash: [5, 5], pointRadius: 0, tension: 0.2 }
+                    ]
+                },
+                options: chartOptions('Year (Age)', 'Nominal Balance ($)')
+            }),
+            update(chart, sim, inp) {
+                const rates = [Math.max(0, inp.grossRate - SCENARIO_SPREAD), inp.grossRate, inp.grossRate + SCENARIO_SPREAD];
+                const names = ['Lower', 'Base', 'Higher'];
+                chart.data.labels = sim.labels;
+                rates.forEach((rate, k) => {
+                    const ds = chart.data.datasets[k];
+                    ds.label = `${names[k]} (${rate.toFixed(1)}% gross)`;
+                    ds.data = rate === inp.grossRate ? sim.nominal : simulate(inp, rate).nominal;
+                });
+            }
+        }
+    };
+
+    const chartHost = document.getElementById('chartHost');
+    const chartSelect = document.getElementById('chartSelect');
+    const charts = {};            // view key -> { chart, box }, filled on first use
+    let activeView = 'balance';
+    let latest = null;            // { inp, sim } from the most recent calculation
+    let latestSimulationData = null;
+
+    Object.entries(CHART_VIEWS).forEach(([key, view]) => {
+        chartSelect.add(new Option(view.title, key));
+    });
+
+    // Build the canvas and Chart instance for a view the first time it is shown.
+    function ensureChart(key) {
+        if (charts[key]) return charts[key];
+        const box = document.createElement('div');
+        box.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', CHART_VIEWS[key].aria);
+        box.appendChild(canvas);
+        chartHost.appendChild(box);
+        charts[key] = { chart: CHART_VIEWS[key].create(canvas), box };
+        return charts[key];
+    }
+
+    // Only the visible chart is created and refreshed; the others are updated when they are next selected.
+    function renderActiveChart() {
+        if (!latest) return;
+        const entry = ensureChart(activeView);
+        Object.entries(charts).forEach(([key, c]) => { c.box.hidden = key !== activeView; });
+        CHART_VIEWS[activeView].update(entry.chart, latest.sim, latest.inp);
+        entry.chart.update();
+    }
+
+    function calculate() {
+        syncLimits();
+
+        const inp = readInputs();
+        const sim = simulate(inp, inp.grossRate);
+        latest = { inp, sim };
+
+        const { startYear, startAge, retireAge, initial, salary, salarySac, afterTax, contribYears, grossRate, deductions, inflation } = inp;
+        const { totalYears, netRatePct, taxPaid, govtTotal, flags } = sim;
+        const endYear = startYear + totalYears;
+
+        renderActiveChart();
+        updateSectionSummaries(inp, netRatePct);
+
+        const finalNominal = sim.nominal[totalYears];
+        const finalReal = sim.real[totalYears];
+        const finalContrib = sim.contrib[totalYears];
+
+        // ---- Warnings ----
+        const warnings = [];
+        if (retireAge < PRESERVATION_AGE) {
+            warnings.push(`Super is generally not accessible before age ${PRESERVATION_AGE} (preservation age), so retiring at ${retireAge} would need another condition of release.`);
+        }
+        if (flags.concExcessYear !== null) {
+            warnings.push(`Employer plus salary sacrifice contributions exceed the ${formatCurrency(CONCESSIONAL_CAP)} concessional cap from ${flags.concExcessYear}. The excess is excluded from this projection.`);
+        }
+        if (flags.afterTaxExcessYear !== null) {
+            warnings.push(`After-tax contributions exceed the ${formatCurrency(NON_CONCESSIONAL_CAP)} cap. The excess is excluded from this projection.`);
+        }
+        if (flags.div293Year !== null) {
+            warnings.push(`Division 293 applies from ${flags.div293Year}: concessional contributions on income above ${formatCurrency(DIV293_THRESHOLD)} are taxed at 30%.`);
+        }
+
+        // ---- Notes (informational) ----
+        const yearSpan = ys => ys.length === 1 ? `${ys[0]}` : `${ys[0]} to ${ys[ys.length - 1]}`;
+        const notes = [];
+        if (flags.listoYears.length) {
+            notes.push(`Low income super tax offset applies in ${yearSpan(flags.listoYears)} (salary at or below ${formatCurrency(LISTO_THRESHOLD)}): contributions tax is refunded up to ${formatCurrency(LISTO_MAX)} a year.`);
+        }
+        if (flags.coConYears.length) {
+            notes.push(`Government co-contribution applies in ${yearSpan(flags.coConYears)}: ${(COCONTRIB_MATCH * 100).toFixed(0)}c per $1 of personal after-tax contributions, up to ${formatCurrency(COCONTRIB_MAX)} a year, phasing out between ${formatCurrency(COCONTRIB_LOWER)} and ${formatCurrency(COCONTRIB_HIGHER)}.`);
+        } else if (afterTax === 0 && salary > 0 && salary < COCONTRIB_HIGHER && startAge <= COCONTRIB_MAX_AGE) {
+            notes.push(`For information: at this income level, a government co-contribution of up to ${formatCurrency(COCONTRIB_MAX)} a year is available on personal after-tax contributions. It is not included unless you enter an after-tax contribution amount.`);
+        }
+
+        const toBox = cls => text => {
+            const d = document.createElement('div');
+            d.className = cls;
+            d.textContent = text;
+            return d;
+        };
+        document.getElementById('warnings').replaceChildren(
+            ...warnings.map(toBox('warning')),
+            ...notes.map(toBox('warning note'))
+        );
+
+        document.getElementById('subtitle').textContent =
+            `Forecast balance from ${startYear} to ${endYear} (age ${startAge} to ${retireAge}) with Australian contribution tax, caps, inflation and fee modelling.`;
+        document.getElementById('lblTarget').textContent = `Retirement (Age ${retireAge})`;
+        document.getElementById('cardTarget').textContent = endYear;
+        document.getElementById('lblNominal').textContent = `Nominal Balance (${endYear})`;
+        document.getElementById('cardNetRate').textContent = netRatePct.toFixed(2) + '%';
+        document.getElementById('cardNominal').textContent = formatCurrency(finalNominal);
+        document.getElementById('cardReal').textContent = formatCurrency(finalReal);
+        document.getElementById('cardContrib').textContent = formatCurrency(finalContrib);
+        document.getElementById('cardTax').textContent = formatCurrency(taxPaid);
+        document.getElementById('cardGovt').textContent = formatCurrency(govtTotal);
+        document.getElementById('cardGrowth').textContent = formatCurrency(finalNominal - finalContrib);
+        document.getElementById('lblIncome').textContent = `Illustrative Income p.a. (${(DRAWDOWN_RATE * 100).toFixed(0)}% Drawdown, Today's $)`;
+        document.getElementById('cardIncome').textContent = formatCurrency(finalReal * DRAWDOWN_RATE);
+
+        latestSimulationData = {
+            metadata: {
+                title: 'Superannuation Projection Report',
+                generatedDate: new Date().toISOString().split('T')[0],
+                currency: 'AUD',
+                targetYear: endYear,
+                targetAge: retireAge
+            },
+            inputParameters: {
+                startYear,
+                startAge,
+                retirementAge: retireAge,
+                startingBalance: initial,
+                annualSalary: salary,
+                salaryGrowthPercent: round2(inp.salaryGrowth * 100),
+                employerSuperGuaranteePercent: round2(inp.sgRate * 100),
+                salarySacrificeAnnual: salarySac,
+                afterTaxContributionsAnnual: afterTax,
+                contributionDurationYears: contribYears,
+                grossGrowthRatePercent: grossRate,
+                annualDeductionsPercent: deductions,
+                effectiveNetReturnPercent: round2(netRatePct),
+                annualInflationRatePercent: inflation
+            },
+            summaryResults: {
+                nominalBalanceAtRetirement: round2(finalNominal),
+                realPurchasingPowerAtRetirement: round2(finalReal),
+                totalContributedAfterTax: round2(finalContrib),
+                contributionsTaxPaid: round2(taxPaid),
+                governmentSupportTotal: round2(govtTotal),
+                growthEarned: round2(finalNominal - finalContrib),
+                illustrativeAnnualIncomeTodaysDollars: round2(finalReal * DRAWDOWN_RATE)
+            },
+            yearlyProjections: sim.rows.map(r => ({
+                year: r.year,
+                age: r.age,
+                isContributing: r.yr >= 1 && r.yr <= contribYears,
+                salary: round2(r.salary),
+                concessionalContributions: round2(r.concessional),
+                afterTaxContributions: round2(r.afterTax),
+                contributionsTax: round2(r.tax),
+                lowIncomeSuperTaxOffset: round2(r.listo),
+                governmentCoContribution: round2(r.coCon),
+                totalContributionsAdded: round2(r.contributed),
+                nominalBalance: round2(r.balance),
+                realPurchasingPower: round2(r.real)
+            }))
+        };
+    }
+
+    function exportToJson() {
+        if (!latestSimulationData) return;
+        const blob = new Blob([JSON.stringify(latestSimulationData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `super_projection_${latestSimulationData.inputParameters.startYear}_to_${latestSimulationData.metadata.targetYear}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    // ---- Assumptions & limitations (built from the constants so the text always matches the maths) ----
+    function renderAssumptions() {
+        const pct = v => (v * 100).toFixed(0) + '%';
+        const section = (title, items) => {
+            const h = document.createElement('h3');
+            h.textContent = title;
+            const ul = document.createElement('ul');
+            items.forEach(t => {
+                const li = document.createElement('li');
+                li.textContent = t;
+                ul.appendChild(li);
+            });
+            return [h, ul];
+        };
+
+        const body = document.getElementById('assumptionsBody');
+        body.replaceChildren(
+            ...section('Purpose', [
+                'To illustrate how the figures you enter could grow over time. It is general information, not advice or a recommendation about any product or fund.'
+            ]),
+            ...section(`Rules applied (${RATES_AS_AT} financial year figures, held constant in every future year)`, [
+                `Concessional contributions are taxed at ${pct(CONTRIBUTIONS_TAX)}, or ${pct(CONTRIBUTIONS_TAX + DIV293_EXTRA_TAX)} on the part of income above ${formatCurrency(DIV293_THRESHOLD)} (Division 293).`,
+                `Concessional contributions are capped at ${formatCurrency(CONCESSIONAL_CAP)} a year and after-tax contributions at ${formatCurrency(NON_CONCESSIONAL_CAP)} a year. Amounts above a cap are left out.`,
+                `Employer Super Guarantee is paid on salary up to ${formatCurrency(MAX_SG_BASE)} a year.`,
+                `Low income super tax offset: ${pct(LISTO_RATE)} of concessional contributions, up to ${formatCurrency(LISTO_MAX)} a year, when salary is ${formatCurrency(LISTO_THRESHOLD)} or less.`,
+                `Government co-contribution: ${(COCONTRIB_MATCH * 100).toFixed(0)}c per $1 of personal after-tax contributions, up to ${formatCurrency(COCONTRIB_MAX)} a year, between ${formatCurrency(COCONTRIB_LOWER)} and ${formatCurrency(COCONTRIB_HIGHER)} of income, to age ${COCONTRIB_MAX_AGE}. Income is taken as gross salary.`,
+                `Super is generally not accessible before age ${PRESERVATION_AGE}.`
+            ]),
+            ...section('Default assumptions you can change', [
+                'Defaults are illustrative starting points, not predictions. Change every value to match your own situation.',
+                'Inflation of 2.5% a year is the mid-point of the Reserve Bank of Australia\'s 2 to 3 per cent target range.',
+                'Employer Super Guarantee of 12% is the legislated rate.',
+                'Growth, fees and earnings tax are entered as one net rate. Actual returns vary from year to year and can be negative, and fees differ between funds.'
+            ]),
+            ...section('Limitations that affect the result', [
+                'Caps and thresholds are not indexed, so in later years the result will differ from real rules, and benefits tied to income thresholds are understated for people whose pay rises.',
+                'Contributions, salary growth and returns are smooth. Real markets are volatile and the order of returns matters.',
+                'Not included: the Age Pension, tax on withdrawals, carry-forward of unused concessional cap, insurance premiums, spouse contributions, and changes to the law.',
+                'The government co-contribution is credited in the year of the contribution. In practice it is paid after your tax return is assessed, and other eligibility conditions apply.',
+                `The retirement income figure uses a fixed ${pct(DRAWDOWN_RATE)} yearly drawdown for illustration. It is not a prediction of what you could safely withdraw.`
+            ])
+        );
+    }
+
+    // ---- Import: restores input fields only (results are recalculated, never read back) ----
+    // Maps control id -> key inside "inputParameters" of the downloaded JSON.
+    const IMPORT_KEYS = {
+        startYear:    'startYear',
+        startAge:     'startAge',
+        retireAge:    'retirementAge',
+        initial:      'startingBalance',
+        salary:       'annualSalary',
+        salaryGrowth: 'salaryGrowthPercent',
+        sgRate:       'employerSuperGuaranteePercent',
+        salarySac:    'salarySacrificeAnnual',
+        afterTax:     'afterTaxContributionsAnnual',
+        contribYears: 'contributionDurationYears',
+        grossRate:    'grossGrowthRatePercent',
+        deductions:   'annualDeductionsPercent',
+        inflation:    'annualInflationRatePercent'
+    };
+    const MAX_IMPORT_BYTES = 1024 * 1024;
+
+    function setImportStatus(text, isError) {
+        const el = document.getElementById('importStatus');
+        el.textContent = text;
+        el.classList.toggle('error', !!isError);
+    }
+
+    function applyImportedInputs(params) {
+        const imported = [];
+        const rawValues = {};
+        Object.entries(IMPORT_KEYS).forEach(([id, key]) => {
+            const v = params[key];
+            if (typeof v === 'number' && Number.isFinite(v)) {
+                els[id].num.value = v;
+                rawValues[id] = v;
+                imported.push(id);
+            }
+        });
+        if (imported.length === 0) return null;
+
+        // Age/year limits drive the contribution-duration limit, so refresh them before clamping every field.
+        syncLimits();
+        let adjusted = 0;
+        imported.forEach(id => {
+            const v = readValue(id);
+            if (v !== rawValues[id]) adjusted++;
+            els[id].num.value = els[id].slider.value = v;
+        });
+        return { count: imported.length, adjusted };
+    }
+
+    function importFromJson(file) {
+        if (!file) return;
+        if (file.size > MAX_IMPORT_BYTES) {
+            setImportStatus('Import failed: file is too large.', true);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onerror = () => setImportStatus('Import failed: the file could not be read.', true);
+        reader.onload = () => {
+            let data;
+            try {
+                data = JSON.parse(reader.result);
+            } catch (e) {
+                setImportStatus('Import failed: the file is not valid JSON.', true);
+                return;
+            }
+            const params = data && typeof data === 'object' ? data.inputParameters : null;
+            if (!params || typeof params !== 'object') {
+                setImportStatus('Import failed: no input parameters found in this file.', true);
+                return;
+            }
+            const result = applyImportedInputs(params);
+            if (!result) {
+                setImportStatus('Import failed: no recognised input fields found in this file.', true);
+                return;
+            }
+            calculate();
+            const total = Object.keys(IMPORT_KEYS).length;
+            let msg = `Imported ${result.count} of ${total} input fields from ${file.name}.`;
+            if (result.adjusted) msg += ` ${result.adjusted} value(s) were outside the allowed range and were adjusted.`;
+            setImportStatus(msg, false);
+        };
+        reader.readAsText(file);
+    }
+
+    // ---- Wiring ----
+    Object.values(els).forEach(({ slider, num }) => {
+        slider.addEventListener('input', () => {
+            num.value = slider.value;
             calculate();
         });
-
-        numEl.addEventListener('input', () => {
-            sliderEl.value = numEl.value;
+        // Live-update while typing (without rewriting the field); normalise on blur/enter.
+        num.addEventListener('input', () => {
+            const id = Object.keys(els).find(k => els[k].num === num);
+            slider.value = readValue(id);
+            calculate();
+        });
+        num.addEventListener('change', () => {
+            const id = Object.keys(els).find(k => els[k].num === num);
+            num.value = slider.value = readValue(id);
             calculate();
         });
     });
 
-    // Attach export button listener
     document.getElementById('btnExportJson').addEventListener('click', exportToJson);
 
-    // Initial calculation on load
+    const importInput = document.getElementById('fileImportJson');
+    document.getElementById('btnImportJson').addEventListener('click', () => importInput.click());
+    importInput.addEventListener('change', () => {
+        importFromJson(importInput.files[0]);
+        importInput.value = '';   // allow re-importing the same file
+    });
+
+    chartSelect.addEventListener('change', () => {
+        activeView = chartSelect.value;
+        renderActiveChart();
+    });
+
+    renderAssumptions();
     calculate();
 </script>
 

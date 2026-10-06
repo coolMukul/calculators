@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pension Fund Drawdown & Age Pension Simulator</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -149,6 +149,8 @@
 
         .header-actions {
             display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
@@ -168,6 +170,22 @@
 
         .btn-export:hover {
             background-color: var(--primary-hover);
+        }
+
+        .btn-secondary {
+            background-color: #ffffff;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: #eff6ff;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         .summary-cards {
@@ -215,6 +233,185 @@
             width: 100%;
         }
 
+        .chart-title {
+            margin: 24px 0 8px 0;
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .chart-container.short {
+            height: 320px;
+        }
+
+        .check-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-bottom: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .check-row input {
+            margin-top: 3px;
+            accent-color: var(--primary);
+        }
+
+        .check-row small {
+            display: block;
+            font-weight: 400;
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .plan-box {
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 12px;
+        }
+
+        .plan-box .btn-export {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        details.more {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 12px;
+        }
+
+        details.more[open] {
+            padding-bottom: 4px;
+        }
+
+        details.more summary {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            cursor: pointer;
+            list-style: none;
+            font-size: 0.9rem;
+            font-weight: 700;
+        }
+
+        details.more summary::-webkit-details-marker {
+            display: none;
+        }
+
+        details.more summary::before {
+            content: "\25B8";
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        details.more[open] > summary::before {
+            content: "\25BE";
+        }
+
+        details.more summary .opt {
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        /* One-line recap of the section's values, shown only while it is collapsed */
+        details.more summary .sum {
+            margin-left: auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 0.75rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        details.more[open] > summary .sum {
+            display: none;
+        }
+
+        details.more > summary + * {
+            margin-top: 12px;
+        }
+
+        details.more .section-title {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 6px;
+        }
+
+        .oneoff-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .oneoff-row input[type="number"] {
+            width: 90px;
+        }
+
+        .btn-link {
+            background: none;
+            border: none;
+            color: var(--primary);
+            cursor: pointer;
+            font-size: 0.82rem;
+            font-weight: 600;
+            padding: 4px 0;
+        }
+
+        .btn-icon {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 2px 6px;
+        }
+
+        .compare-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.82rem;
+            margin-bottom: 8px;
+        }
+
+        .compare-table th,
+        .compare-table td {
+            text-align: right;
+            padding: 6px 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .compare-table th:first-child,
+        .compare-table td:first-child {
+            text-align: left;
+        }
+
+        .compare-table th {
+            color: var(--text-muted);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .delta-up { color: var(--secondary); }
+        .delta-down { color: #dc2626; }
+
+        .hint {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
         footer {
             margin-top: 20px;
             font-size: 0.8rem;
@@ -234,109 +431,193 @@
     <div class="grid">
         <!-- Controls Panel -->
         <div class="panel">
-            <div class="section-title">Relationship Status</div>
-            <div class="toggle-group">
-                <button class="toggle-btn active" id="btnSingle">Single</button>
-                <button class="toggle-btn" id="btnCouple">Couple (Combined)</button>
-            </div>
+            <details class="more" id="secAbout" open>
+                <summary>About you <span class="sum" id="sumAbout"></span></summary>
 
-            <div class="section-title">Homeowner Status</div>
-            <div class="toggle-group">
-                <button class="toggle-btn active" id="btnHomeowner">Homeowner</button>
-                <button class="toggle-btn" id="btnNonHomeowner">Non-Homeowner</button>
-            </div>
+                <div class="section-title">Relationship Status</div>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" id="btnSingle">Single</button>
+                    <button class="toggle-btn" id="btnCouple">Couple (Combined)</button>
+                </div>
 
-            <div class="section-title">Account & Drawdown Parameters</div>
+                <div class="section-title">Homeowner Status</div>
+                <div class="toggle-group">
+                    <button class="toggle-btn active" id="btnHomeowner">Homeowner</button>
+                    <button class="toggle-btn" id="btnNonHomeowner">Non-Homeowner</button>
+                </div>
 
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Starting Age</span>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Starting Age</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="startAgeSlider" min="60" max="80" step="1" value="60">
+                        <input type="number" id="startAgeNum" min="60" max="80" step="1" value="60">
+                    </div>
                 </div>
-                <div class="input-row">
-                    <input type="range" id="startAgeSlider" min="60" max="80" step="1" value="60">
-                    <input type="number" id="startAgeNum" min="60" max="80" step="1" value="60">
-                </div>
-            </div>
 
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Starting Balance ($)</span>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Starting Balance ($)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="initialSlider" min="50000" max="2000000" step="10000" value="800000">
+                        <input type="number" id="initialNum" min="0" max="5000000" step="1000" value="800000">
+                    </div>
                 </div>
-                <div class="input-row">
-                    <input type="range" id="initialSlider" min="50000" max="2000000" step="10000" value="800000">
-                    <input type="number" id="initialNum" min="0" max="5000000" step="1000" value="800000">
-                </div>
-            </div>
+            </details>
 
-            <!-- Pre-67 Drawdown Control (Visible when Start Age < 67) -->
-            <div class="control-group" id="groupPre67">
-                <div class="control-label">
-                    <span>Monthly Drawdown (Ages 60–66) ($)</span>
-                </div>
-                <div class="input-row">
-                    <input type="range" id="monthlyDrawPreSlider" min="500" max="15000" step="100" value="4500">
-                    <input type="number" id="monthlyDrawPreNum" min="0" max="25000" step="100" value="4500">
-                </div>
-            </div>
+            <details class="more" id="secDraw" open>
+                <summary>Drawdown &amp; plan <span class="sum" id="sumDraw"></span></summary>
 
-            <!-- Post-67 Drawdown Control -->
-            <div class="control-group">
-                <div class="control-label">
-                    <span id="lblPost67">Monthly Drawdown (Age 67+) ($)</span>
+                <!-- Pre-67 Drawdown Control (Visible when Start Age < 67) -->
+                <div class="control-group" id="groupPre67">
+                    <div class="control-label">
+                        <span>Monthly Drawdown (Ages 60–66) ($)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="monthlyDrawPreSlider" min="500" max="15000" step="100" value="4500">
+                        <input type="number" id="monthlyDrawPreNum" min="0" max="25000" step="100" value="4500">
+                    </div>
                 </div>
-                <div class="input-row">
-                    <input type="range" id="monthlyDrawPostSlider" min="500" max="15000" step="100" value="2500">
-                    <input type="number" id="monthlyDrawPostNum" min="0" max="25000" step="100" value="2500">
-                </div>
-            </div>
 
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Investment Return (% p.a.)</span>
+                <!-- Post-67 Drawdown Control -->
+                <div class="control-group">
+                    <div class="control-label">
+                        <span id="lblPost67">Monthly Drawdown (Age 67+) ($)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="monthlyDrawPostSlider" min="500" max="15000" step="100" value="2500">
+                        <input type="number" id="monthlyDrawPostNum" min="0" max="25000" step="100" value="2500">
+                    </div>
                 </div>
-                <div class="input-row">
-                    <input type="range" id="returnRateSlider" min="0" max="12" step="0.1" value="6.0">
-                    <input type="number" id="returnRateNum" min="0" max="15" step="0.1" value="6.0">
-                </div>
-            </div>
 
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Inflation Rate (% p.a.)</span>
+                <div class="control-group plan-box">
+                    <div class="control-label">
+                        <span>Plan to age (life expectancy)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="planToAgeSlider" min="70" max="100" step="1" value="90">
+                        <input type="number" id="planToAgeNum" min="61" max="100" step="1" value="90">
+                    </div>
+                    <div class="hint" id="planStatus"></div>
+                    <button type="button" class="btn-export" id="btnSolveDraw" title="Finds the highest steady monthly income that lasts to this age">Set drawdown to last to this age</button>
+                    <div class="hint" id="solveStatus"></div>
                 </div>
-                <div class="input-row">
-                    <input type="range" id="inflationSlider" min="0" max="8" step="0.1" value="2.5">
-                    <input type="number" id="inflationNum" min="0" max="8" step="0.1" value="2.5">
-                </div>
-            </div>
+            </details>
 
-            <div class="section-title" style="margin-top: 24px;">Age Pension Test Inputs</div>
+            <details class="more" id="secMarket">
+                <summary>Market &amp; assumptions <span class="sum" id="sumMarket"></span></summary>
 
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Full Pension Asset Threshold ($)</span>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Investment Return (% p.a.)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="returnRateSlider" min="0" max="12" step="0.1" value="6.0">
+                        <input type="number" id="returnRateNum" min="0" max="15" step="0.1" value="6.0">
+                    </div>
                 </div>
-                <div class="input-row">
-                    <input type="number" id="assetThresholdNum" value="314000" style="width: 100%;">
-                </div>
-            </div>
 
-            <div class="control-group">
-                <div class="control-label">
-                    <span>Projected Assessable Assets ($)</span>
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Inflation Rate (% p.a.)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="inflationSlider" min="0" max="8" step="0.1" value="2.5">
+                        <input type="number" id="inflationNum" min="0" max="8" step="0.1" value="2.5">
+                    </div>
                 </div>
-                <div class="input-row">
-                    <input type="number" id="projectedAssetsNum" value="50000" style="width: 100%;">
+
+                <label class="check-row">
+                    <input type="checkbox" id="chkIndexDraw">
+                    <span>Index drawdown to inflation
+                        <small>Drawdown amounts are today's dollars and rise each year with inflation.</small>
+                    </span>
+                </label>
+                <label class="check-row">
+                    <input type="checkbox" id="chkIndexPension" checked>
+                    <span>Index Age Pension rates &amp; thresholds
+                        <small>Pension rate, asset and income limits and other assets rise with inflation.</small>
+                    </span>
+                </label>
+                <label class="check-row">
+                    <input type="checkbox" id="chkMinDraw" checked>
+                    <span>Enforce minimum drawdown rules
+                        <small>Withdraw at least the age-based minimum percentage of the balance each year.</small>
+                    </span>
+                </label>
+            </details>
+
+            <details class="more" id="workDetails">
+                <summary>Other income <span class="opt">(optional)</span> <span class="sum" id="sumWork"></span></summary>
+                <div class="control-group">
+                    <div class="control-label"><span>Part-time work income ($ per month)</span></div>
+                    <div class="input-row">
+                        <input type="number" id="workIncomeNum" min="0" max="20000" step="100" value="0">
+                    </div>
                 </div>
-            </div>
+                <div class="control-group">
+                    <div class="control-label"><span>Work until age</span></div>
+                    <div class="input-row">
+                        <input type="number" id="workUntilAgeNum" min="60" max="100" step="1" value="67">
+                    </div>
+                    <div class="hint">The first $300 a fortnight of work income does not reduce your Age Pension.</div>
+                </div>
+                <div class="control-group">
+                    <div class="control-label"><span>Other income, e.g. rent ($ per month)</span></div>
+                    <div class="input-row">
+                        <input type="number" id="otherIncomeNum" min="0" max="20000" step="100" value="0">
+                    </div>
+                    <div class="hint">Before-tax amounts. Add the value of any investment property to "other assets" under Age Pension tests.</div>
+                </div>
+            </details>
+
+            <details class="more" id="oneOffDetails">
+                <summary>One-off withdrawals <span class="opt">(optional)</span> <span class="sum" id="sumOneOff"></span></summary>
+                <div id="oneOffList"></div>
+                <button type="button" class="btn-link" id="btnAddOneOff">+ Add a withdrawal</button>
+                <div class="hint">For example a renovation, a car or an aged-care deposit. Taken from your super at the start of that age.</div>
+            </details>
+
+            <details class="more" id="secPension">
+                <summary>Age Pension tests <span class="sum" id="sumPension"></span></summary>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Full Pension Asset Threshold ($)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="number" id="assetThresholdNum" value="333000" style="width: 100%;">
+                    </div>
+                    <div class="hint">Set automatically from Single/Couple and Homeowner. Change it only to override.</div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Projected Assessable Assets ($)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="number" id="projectedAssetsNum" value="50000" style="width: 100%;">
+                    </div>
+                    <div class="hint">Savings, shares and other assessable assets outside super. Exclude your home. Treated as deemed financial assets.</div>
+                </div>
+            </details>
         </div>
 
         <!-- Output Panel -->
         <div class="panel">
             <div class="header-actions">
                 <h3 style="margin: 0; font-size: 1.1rem;">Drawdown & Cash Flow Forecast</h3>
-                <button class="btn-export" id="btnExportJson">Download JSON</button>
+                <div class="action-buttons">
+                    <button class="btn-export btn-secondary" id="btnCompare" title="Keep the current result so you can change inputs and compare">Save as comparison</button>
+                    <button class="btn-export btn-secondary" id="btnImportJson" title="Load saved input values from a downloaded JSON file">Import JSON</button>
+                    <button class="btn-export" id="btnExportJson">Download JSON</button>
+                    <input type="file" id="importFile" accept=".json,application/json" hidden>
+                </div>
             </div>
+
+            <div class="hint" id="importStatus" style="margin: -8px 0 12px 0; min-height: 1em;"></div>
 
             <div class="summary-cards">
                 <div class="card">
@@ -345,60 +626,142 @@
                     <div class="card-subtext" id="cardDrawSubtext">Ages 60–66</div>
                 </div>
                 <div class="card">
-                    <div class="card-label">Fortnightly Pension (Age 67)</div>
+                    <div class="card-label" id="cardPensionLabel">Fortnightly Pension (Age 67)</div>
                     <div class="card-value pension" id="cardFortnightlyPension">$0</div>
                     <div class="card-subtext" id="cardPensionSubtext">At Age 67</div>
                 </div>
                 <div class="card">
-                    <div class="card-label">Total Income (Age 67 Nominal)</div>
+                    <div class="card-label" id="cardTotalLabel">Total Monthly Income (Age 67 Nominal)</div>
                     <div class="card-value income" id="cardTotalMonthlyIncome">$2,500</div>
                     <div class="card-subtext">Nominal future dollars</div>
                 </div>
                 <div class="card">
-                    <div class="card-label">Total Income (In Today's 2026 $)</div>
+                    <div class="card-label" id="cardRealLabel">Total Monthly Income (Today's $)</div>
                     <div class="card-value real" id="cardRealMonthlyIncome">$2,100</div>
-                    <div class="card-subtext">Inflation-adjusted at Age 67</div>
+                    <div class="card-subtext" id="cardRealSubtext">Inflation-adjusted at Age 67</div>
+                </div>
+                <div class="card">
+                    <div class="card-label" id="cardRealBalanceLabel">Real Balance (Today's $)</div>
+                    <div class="card-value real" id="cardRealBalance">$0</div>
+                    <div class="card-subtext" id="cardRealBalanceSubtext">Inflation-adjusted at Age 67</div>
                 </div>
                 <div class="card">
                     <div class="card-label">Est. Depletion Age</div>
                     <div class="card-value" id="cardDepletionAge">Age 88</div>
-                    <div class="card-subtext">Balance reaches $0</div>
+                    <div class="card-subtext" id="cardDepletionSubtext">Balance reaches $0</div>
                 </div>
             </div>
 
+            <div id="compareBox" hidden>
+                <div class="chart-title" style="margin-top: 0;">Comparison with saved result</div>
+                <table class="compare-table">
+                    <thead><tr><th></th><th id="compareSavedHead">Saved</th><th>Now</th><th>Change</th></tr></thead>
+                    <tbody id="compareBody"></tbody>
+                </table>
+            </div>
+
+            <div class="chart-title">Account Balance</div>
             <div class="chart-container">
                 <canvas id="pensionChart"></canvas>
+            </div>
+
+            <div class="chart-title">Monthly Income by Source (Today's $)</div>
+            <div class="chart-container short">
+                <canvas id="incomeChart"></canvas>
             </div>
         </div>
     </div>
 
     <footer>
-        * Age pension estimates based on Centrelink asset taper rates ($3.00 reduction per fortnight per $1,000 above threshold). Thresholds auto-set based on Single/Couple and Homeowner/Non-Homeowner selections.
+        * Age Pension is estimated as the lower of the assets test and the income test (income is deemed from financial assets). Rates and thresholds are as at <span id="ratesAsAt">20 September 2026</span> and are set from the Single/Couple and Homeowner/Non-Homeowner selections. Work income: the first $300 a fortnight is exempt (the Work Bonus saved-up balance is not modelled). Estimates only, not advice.
     </footer>
 </div>
 
 <script>
+    // ---- Static rules (as at AGE_PENSION_RATES.asOf) -------------------------------------------
+    const PENSION_AGE = 67;
+    const MAX_PROJECTION_YEARS = 40;
+    const MAX_ONE_OFFS = 10;
+    const SCENARIO_RETURN_SPREAD = 2; // +/- percentage points for the low/high return scenarios
+
+    const AGE_PENSION_RATES = {
+        asOf: '20 September 2026',
+        maxFortnightly: { single: 1237.70, couple: 1866.00 },          // combined for couples, incl. supplements
+        assetThreshold: {
+            single: { homeowner: 333000, nonHomeowner: 600000 },
+            couple: { homeowner: 499000, nonHomeowner: 766000 }
+        },
+        assetTaperPer1000: 3.00,                                        // $ per fortnight per $1,000 over threshold
+        incomeFreeAreaFortnightly: { single: 226, couple: 396 },
+        incomeTaper: 0.5,                                               // $ per fortnight per $1 over free area
+        workBonusFortnightly: 300,                                      // employment income exempt from the income test
+        deeming: {
+            threshold: { single: 66800, couple: 110600 },
+            lowRate: 0.0175,
+            highRate: 0.0375
+        }
+    };
+
+    // Minimum annual account-based pension withdrawal, as % of balance, by age band
+    const MIN_DRAWDOWN_RATES = [
+        { fromAge: 95, rate: 0.14 },
+        { fromAge: 90, rate: 0.11 },
+        { fromAge: 85, rate: 0.09 },
+        { fromAge: 80, rate: 0.07 },
+        { fromAge: 75, rate: 0.06 },
+        { fromAge: 65, rate: 0.05 },
+        { fromAge: 0,  rate: 0.04 }
+    ];
+
+    // ---- Controls ------------------------------------------------------------------------------
+    // `key` is the name used for the field in the exported / imported JSON inputParameters.
     const controls = [
-        { id: 'startAge', slider: 'startAgeSlider', num: 'startAgeNum' },
-        { id: 'initial', slider: 'initialSlider', num: 'initialNum' },
-        { id: 'monthlyDrawPre', slider: 'monthlyDrawPreSlider', num: 'monthlyDrawPreNum' },
-        { id: 'monthlyDrawPost', slider: 'monthlyDrawPostSlider', num: 'monthlyDrawPostNum' },
-        { id: 'returnRate', slider: 'returnRateSlider', num: 'returnRateNum' },
-        { id: 'inflation', slider: 'inflationSlider', num: 'inflationNum' }
+        { id: 'startAge',        slider: 'startAgeSlider',        num: 'startAgeNum',        key: 'startingAge' },
+        { id: 'initial',         slider: 'initialSlider',         num: 'initialNum',         key: 'startingBalance' },
+        { id: 'monthlyDrawPre',  slider: 'monthlyDrawPreSlider',  num: 'monthlyDrawPreNum',  key: 'monthlyWithdrawalAges60To66' },
+        { id: 'monthlyDrawPost', slider: 'monthlyDrawPostSlider', num: 'monthlyDrawPostNum', key: 'monthlyWithdrawalAge67Plus' },
+        { id: 'returnRate',      slider: 'returnRateSlider',      num: 'returnRateNum',      key: 'investmentReturnPercent' },
+        { id: 'inflation',       slider: 'inflationSlider',       num: 'inflationNum',       key: 'inflationRatePercent' },
+        { id: 'planToAge',       slider: 'planToAgeSlider',       num: 'planToAgeNum',       key: 'planToAge' }
+    ];
+
+    // Number inputs without a slider
+    const plainNumberInputs = [
+        { num: 'assetThresholdNum',   key: 'assetThreshold' },
+        { num: 'projectedAssetsNum',  key: 'projectedOtherAssets' },
+        { num: 'workIncomeNum',       key: 'workIncomeMonthly' },
+        { num: 'workUntilAgeNum',     key: 'workUntilAge' },
+        { num: 'otherIncomeNum',      key: 'otherIncomeMonthly' }
+    ];
+
+    const checkboxInputs = [
+        { id: 'chkIndexDraw',    key: 'indexDrawdownToInflation' },
+        { id: 'chkIndexPension', key: 'indexAgePensionToInflation' },
+        { id: 'chkMinDraw',      key: 'enforceMinimumDrawdown' }
     ];
 
     let relationshipStatus = 'single'; // 'single' or 'couple'
-    let isHomeowner = true; // true or false
+    let isHomeowner = true;
     let latestSimulationData = null;
+    let oneOffs = [];          // [{ age, amount }] one-off withdrawals
+    let savedScenario = null;  // snapshot used by the comparison view
+    let lastResult = null;     // latest calculate() output, used when saving a comparison
 
-    // Threshold lookup table based on Centrelink rates
-    const THRESHOLDS = {
-        single: { homeowner: 314000, nonHomeowner: 543000 },
-        couple: { homeowner: 470000, nonHomeowner: 699000 }
+    // ---- Charts --------------------------------------------------------------------------------
+    const currencyFull = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
+
+    function currencyTooltipLabel(context) {
+        let label = context.dataset.label || '';
+        if (label) label += ': ';
+        if (context.parsed.y !== null) label += currencyFull.format(context.parsed.y);
+        return label;
+    }
+
+    const legendOnlyWithData = {
+        labels: { filter: (item, data) => data.datasets[item.datasetIndex].data.length > 0 }
     };
 
-    const ctx = document.getElementById('pensionChart').getContext('2d');
-    let chart = new Chart(ctx, {
+    const balanceChart = new Chart(document.getElementById('pensionChart').getContext('2d'), {
         type: 'line',
         data: {
             labels: [],
@@ -419,6 +782,16 @@
                     backgroundColor: 'transparent',
                     fill: false,
                     tension: 0.2
+                },
+                {
+                    label: "Saved: Real Purchasing Power (Today's $)",
+                    data: [],
+                    borderColor: '#64748b',
+                    borderDash: [2, 4],
+                    backgroundColor: 'transparent',
+                    fill: false,
+                    tension: 0.2,
+                    spanGaps: false
                 }
             ]
         },
@@ -426,49 +799,94 @@
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) label += ': ';
-                            if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
-                            }
-                            return label;
-                        }
-                    }
-                }
-            },
+            plugins: { legend: legendOnlyWithData, tooltip: { callbacks: { label: currencyTooltipLabel } } },
             scales: {
                 x: { title: { display: true, text: 'Age' } },
                 y: {
                     title: { display: true, text: 'Balance ($)' },
-                    ticks: {
-                        callback: function(value) { return '$' + (value / 1000).toFixed(0) + 'k'; }
-                    }
+                    ticks: { callback: value => '$' + (value / 1000).toFixed(0) + 'k' }
+                }
+            }
+        }
+    });
+
+    const incomeChart = new Chart(document.getElementById('incomeChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [
+                { label: "Super Drawdown (Today's $)", data: [], backgroundColor: '#2563eb' },
+                { label: "Age Pension (Today's $)", data: [], backgroundColor: '#d97706' },
+                { label: "Work & Other Income (Today's $)", data: [], backgroundColor: '#7c3aed' },
+                {
+                    type: 'line',
+                    label: "Saved: Total Income (Today's $)",
+                    data: [],
+                    borderColor: '#64748b',
+                    borderDash: [5, 5],
+                    backgroundColor: 'transparent',
+                    pointRadius: 0,
+                    order: 0
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: legendOnlyWithData, tooltip: { callbacks: { label: currencyTooltipLabel } } },
+            scales: {
+                x: { stacked: true, title: { display: true, text: 'Age' } },
+                y: {
+                    stacked: true,
+                    title: { display: true, text: "Monthly Income (Today's $)" },
+                    ticks: { callback: value => '$' + value.toLocaleString('en-AU') }
                 }
             }
         }
     });
 
     function formatCurrency(val) {
-        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+        return new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(val);
+    }
+
+    const round2 = v => Math.round(v * 100) / 100;
+
+    // ---- Age Pension and drawdown rules --------------------------------------------------------
+    // `f` is the indexation factor applied to every dollar limit (1 when indexation is off).
+    // Income arguments are per fortnight; employment income gets the Work Bonus exemption.
+    function agePensionFortnightly(assets, status, assetThreshold, f, employmentFortnightly = 0, otherIncomeFortnightly = 0) {
+        const R = AGE_PENSION_RATES;
+        const maxRate = R.maxFortnightly[status] * f;
+
+        // Assets test
+        const excessAssets = Math.max(0, assets - assetThreshold * f);
+        const assetTest = Math.max(0, maxRate - (excessAssets / 1000) * R.assetTaperPer1000);
+
+        // Income test: income is deemed from financial assets, plus work and other income
+        const deemThreshold = R.deeming.threshold[status] * f;
+        const deemedAnnual = Math.min(assets, deemThreshold) * R.deeming.lowRate
+                           + Math.max(0, assets - deemThreshold) * R.deeming.highRate;
+        const assessableEmployment = Math.max(0, employmentFortnightly - R.workBonusFortnightly * f);
+        const totalIncome = deemedAnnual / 26 + assessableEmployment + otherIncomeFortnightly;
+        const excessIncome = Math.max(0, totalIncome - R.incomeFreeAreaFortnightly[status] * f);
+        const incomeTest = Math.max(0, maxRate - excessIncome * R.incomeTaper);
+
+        const pension = Math.min(assetTest, incomeTest);
+        let test;
+        if (pension >= maxRate - 0.005) test = 'Full rate';
+        else if (pension <= 0) test = 'Not payable';
+        else test = assetTest <= incomeTest ? 'Assets test' : 'Income test';
+        return { pension, test };
+    }
+
+    function minDrawdownRate(age) {
+        return MIN_DRAWDOWN_RATES.find(band => age >= band.fromAge).rate;
     }
 
     function updateThresholdFromToggles() {
         const homeKey = isHomeowner ? 'homeowner' : 'nonHomeowner';
-        const defaultThreshold = THRESHOLDS[relationshipStatus][homeKey];
-        document.getElementById('assetThresholdNum').value = defaultThreshold;
-    }
-
-    function calculateAgePensionFortnightly(assessableAssets, threshold, status) {
-        const maxPension = status === 'couple' ? 1682.80 : 1116.30;
-        if (assessableAssets <= threshold) return maxPension;
-        
-        const excessAssets = assessableAssets - threshold;
-        const reduction = (excessAssets / 1000) * 3.00;
-        return Math.max(0, maxPension - reduction);
+        document.getElementById('assetThresholdNum').value = AGE_PENSION_RATES.assetThreshold[relationshipStatus][homeKey];
     }
 
     function updateControlVisibility() {
@@ -476,7 +894,7 @@
         const groupPre67 = document.getElementById('groupPre67');
         const lblPost67 = document.getElementById('lblPost67');
 
-        if (startAge < 67) {
+        if (startAge < PENSION_AGE) {
             groupPre67.style.display = 'block';
             lblPost67.textContent = "Monthly Drawdown (Age 67+) ($)";
         } else {
@@ -485,142 +903,505 @@
         }
     }
 
+    // ---- Simulation ----------------------------------------------------------------------------
+    function readInputs() {
+        const readNonNegative = id => Math.max(0, parseFloat(document.getElementById(id).value) || 0);
+        return {
+            status: relationshipStatus,
+            isHomeowner: isHomeowner,
+            startAge: Math.min(80, Math.max(60, parseInt(document.getElementById('startAgeNum').value) || 60)),
+            initial: readNonNegative('initialNum'),
+            drawPre: readNonNegative('monthlyDrawPreNum'),
+            drawPost: readNonNegative('monthlyDrawPostNum'),
+            returnRate: readNonNegative('returnRateNum'),
+            inflation: readNonNegative('inflationNum'),
+            assetThreshold: readNonNegative('assetThresholdNum'),
+            otherAssets: readNonNegative('projectedAssetsNum'),
+            indexDraw: document.getElementById('chkIndexDraw').checked,
+            indexPension: document.getElementById('chkIndexPension').checked,
+            enforceMin: document.getElementById('chkMinDraw').checked,
+            planToAge: Math.min(100, Math.max(61, parseInt(document.getElementById('planToAgeNum').value) || 90)),
+            workIncome: readNonNegative('workIncomeNum'),
+            workUntilAge: parseInt(document.getElementById('workUntilAgeNum').value) || 0,
+            otherIncome: readNonNegative('otherIncomeNum'),
+            oneOffs: oneOffs
+                .filter(o => o.amount > 0 && o.age > 0)
+                .map(o => ({ age: Math.round(o.age), amount: o.amount }))
+        };
+    }
+
+    function runSimulation(p) {
+        const monthlyReturn = (p.returnRate / 100) / 12;
+        const annualInflation = p.inflation / 100;
+        const currentYear = new Date().getFullYear();
+
+        const rows = [];
+        let balance = p.initial;
+        let depletionAge = (p.initial === 0) ? p.startAge : null;
+
+        for (let yr = 0; yr <= MAX_PROJECTION_YEARS; yr++) {
+            const age = p.startAge + yr;
+            const inflationFactor = Math.pow(1 + annualInflation, yr);
+            const drawIndex = p.indexDraw ? inflationFactor : 1;     // drawdown and one-offs
+            const limitIndex = p.indexPension ? inflationFactor : 1; // pension limits and other income
+
+            if (balance <= 0 && depletionAge === null && yr > 0) {
+                depletionAge = age;
+                balance = 0;
+            }
+
+            // Draw: the amount entered is in today's dollars when indexation is on
+            const baseDraw = (age < PENSION_AGE) ? p.drawPre : p.drawPost;
+            const targetMonthlyDraw = baseDraw * drawIndex;
+            const minMonthlyDraw = p.enforceMin ? (minDrawdownRate(age) * balance) / 12 : 0;
+            const plannedMonthlyDraw = Math.max(targetMonthlyDraw, minMonthlyDraw);
+            const minimumApplied = balance > 0 && minMonthlyDraw > targetMonthlyDraw + 0.005;
+
+            // One-off withdrawals are taken at the start of the year
+            const oneOffTarget = p.oneOffs.filter(o => o.age === age).reduce((sum, o) => sum + o.amount, 0) * drawIndex;
+            const oneOffDrawn = Math.min(oneOffTarget, balance);
+            const balanceAfterOneOff = balance - oneOffDrawn;
+
+            // Run the year's 12 months up front so the draw reflects what is actually available
+            let yearEndBalance = balanceAfterOneOff;
+            let drawnThisYear = 0;
+            for (let m = 0; m < 12; m++) {
+                if (yearEndBalance > 0) {
+                    const draw = Math.min(plannedMonthlyDraw, yearEndBalance);
+                    drawnThisYear += draw;
+                    yearEndBalance = (yearEndBalance - draw) * (1 + monthlyReturn);
+                }
+            }
+            const actualMonthlyDraw = drawnThisYear / 12;
+
+            // Work and other income (before tax); work stops at the chosen age
+            const monthlyWork = (age < p.workUntilAge) ? p.workIncome * limitIndex : 0;
+            const monthlyOther = p.otherIncome * limitIndex;
+
+            // Age Pension is payable from pension age regardless of the super balance
+            let fortnightlyPension = 0;
+            let pensionTest = 'n/a';
+            if (age >= PENSION_AGE) {
+                const result = agePensionFortnightly(
+                    balanceAfterOneOff + p.otherAssets * limitIndex, p.status, p.assetThreshold, limitIndex,
+                    (monthlyWork * 12) / 26, (monthlyOther * 12) / 26
+                );
+                fortnightlyPension = result.pension;
+                pensionTest = result.test;
+            }
+
+            const monthlyAgePension = (fortnightlyPension * 26) / 12;
+            const totalMonthlyIncome = actualMonthlyDraw + monthlyAgePension + monthlyWork + monthlyOther;
+
+            rows.push({
+                year: currentYear + yr,
+                age: age,
+                nominalBalance: balance,
+                realBalance: balance / inflationFactor,
+                oneOffWithdrawal: oneOffDrawn,
+                monthlySuperDraw: actualMonthlyDraw,
+                minimumDrawdownApplied: minimumApplied,
+                fortnightlyAgePension: fortnightlyPension,
+                pensionTest: pensionTest,
+                monthlyAgePension: monthlyAgePension,
+                monthlyWorkAndOtherIncome: monthlyWork + monthlyOther,
+                totalMonthlyIncomeNominal: totalMonthlyIncome,
+                realSuperDraw: actualMonthlyDraw / inflationFactor,
+                realAgePension: monthlyAgePension / inflationFactor,
+                realWorkAndOtherIncome: (monthlyWork + monthlyOther) / inflationFactor,
+                totalMonthlyIncomeReal: totalMonthlyIncome / inflationFactor
+            });
+
+            balance = yearEndBalance;
+        }
+
+        return { rows, depletionAge };
+    }
+
+    function depletionText(sim, p) {
+        return sim.depletionAge ? `Age ${sim.depletionAge}` : `Age ${p.startAge + MAX_PROJECTION_YEARS}+`;
+    }
+
+    // ---- One-off withdrawals list --------------------------------------------------------------
+    function renderOneOffs() {
+        const list = document.getElementById('oneOffList');
+        list.innerHTML = '';
+        oneOffs.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = 'oneoff-row';
+
+            const makeInput = (value, min, max, step, onChange, label) => {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.min = min;
+                input.max = max;
+                input.step = step;
+                input.value = value;
+                input.setAttribute('aria-label', label);
+                input.addEventListener('input', () => { onChange(input.value); calculate(); });
+                return input;
+            };
+
+            const ageLabel = document.createElement('span');
+            ageLabel.textContent = 'Age';
+            const amountLabel = document.createElement('span');
+            amountLabel.textContent = '$';
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn-icon';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', 'Remove this withdrawal');
+            remove.addEventListener('click', () => { oneOffs.splice(index, 1); renderOneOffs(); calculate(); });
+
+            row.appendChild(ageLabel);
+            row.appendChild(makeInput(item.age, 60, 120, 1, v => { item.age = parseInt(v) || 0; }, 'Withdrawal age'));
+            row.appendChild(amountLabel);
+            row.appendChild(makeInput(item.amount, 0, 5000000, 1000, v => { item.amount = parseFloat(v) || 0; }, 'Withdrawal amount'));
+            row.appendChild(remove);
+            list.appendChild(row);
+        });
+    }
+
+    function addOneOff() {
+        if (oneOffs.length >= MAX_ONE_OFFS) return;
+        // Pre-filled so one click gives a sensible example the user can just adjust
+        const startAge = readInputs().startAge;
+        oneOffs.push({ age: Math.min(100, startAge + 10), amount: 20000 });
+        renderOneOffs();
+        calculate();
+    }
+
+    // Open the optional sections that contain values (used after an import)
+    function openOptionalSectionsWithValues() {
+        const hasValue = id => (parseFloat(document.getElementById(id).value) || 0) > 0;
+        if (hasValue('workIncomeNum') || hasValue('otherIncomeNum')) document.getElementById('workDetails').open = true;
+        if (oneOffs.length > 0) document.getElementById('oneOffDetails').open = true;
+    }
+
+    // ---- Comparison ----------------------------------------------------------------------------
+    function saveComparison() {
+        const { p, sim, incomeRow, incomeAge } = lastResult;
+        const byAge = {};
+        sim.rows.forEach(r => { byAge[r.age] = { realBalance: r.realBalance, totalReal: r.totalMonthlyIncomeReal }; });
+        savedScenario = {
+            byAge,
+            label: `Saved (age ${p.startAge}, ${formatCurrency(p.initial)})`,
+            realIncome: incomeRow.totalMonthlyIncomeReal,
+            realBalance: incomeRow.realBalance,
+            fortnightlyPension: incomeRow.fortnightlyAgePension,
+            depletionAge: sim.depletionAge || (p.startAge + MAX_PROJECTION_YEARS + 1),
+            depletionText: depletionText(sim, p),
+            incomeAge
+        };
+    }
+
+    function renderComparison(current) {
+        const box = document.getElementById('compareBox');
+        const button = document.getElementById('btnCompare');
+        button.textContent = savedScenario ? 'Clear comparison' : 'Save as comparison';
+        if (!savedScenario) {
+            box.hidden = true;
+            return;
+        }
+        box.hidden = false;
+        document.getElementById('compareSavedHead').textContent = savedScenario.label;
+
+        const money = (saved, now, label) => ({ label, saved: formatCurrency(saved), now: formatCurrency(now), diff: now - saved, isMoney: true });
+        const rows = [
+            money(savedScenario.realIncome, current.realIncome, "Monthly income at pension age (Today's $)"),
+            money(savedScenario.realBalance, current.realBalance, "Balance at pension age (Today's $)"),
+            money(savedScenario.fortnightlyPension, current.fortnightlyPension, 'Fortnightly Age Pension'),
+            {
+                label: 'Super lasts until',
+                saved: savedScenario.depletionText,
+                now: current.depletionText,
+                diff: current.depletionAge - savedScenario.depletionAge,
+                isMoney: false
+            }
+        ];
+
+        document.getElementById('compareBody').innerHTML = rows.map(r => {
+            const rounded = Math.round(r.diff);
+            let change = '–';
+            let cls = '';
+            if (rounded !== 0) {
+                cls = rounded > 0 ? 'delta-up' : 'delta-down';
+                const sign = rounded > 0 ? '+' : '−';
+                change = r.isMoney ? `${sign}${formatCurrency(Math.abs(rounded))}` : `${sign}${Math.abs(rounded)} yrs`;
+            }
+            return `<tr><td>${r.label}</td><td>${r.saved}</td><td>${r.now}</td><td class="${cls}">${change}</td></tr>`;
+        }).join('');
+    }
+
+    // ---- Sustainable income ("monthly salary") -------------------------------------------------
+    const MAX_DRAW_INPUT = 25000;
+    let previousDraws = null; // values before the last auto-set, for Undo
+
+    // Money lasts to the plan age when it is not used up by the start of that age
+    function lastsToPlanAge(sim, planAge) {
+        return sim.depletionAge === null || sim.depletionAge > planAge;
+    }
+
+    // Draws (before 67, from 67) that give the same total monthly income before and after
+    // the Age Pension starts. Amounts are today's dollars when the drawdown is indexed.
+    function drawsForIncome(p, income) {
+        const pick = row => p.indexDraw
+            ? { pension: row.realAgePension, other: row.realWorkAndOtherIncome }
+            : { pension: row.monthlyAgePension, other: row.monthlyWorkAndOtherIncome };
+
+        let drawPre = p.drawPre;
+        if (p.startAge < PENSION_AGE) {
+            const first = runSimulation({ ...p, drawPre: 0, drawPost: 0 });
+            drawPre = Math.max(0, income - pick(first.rows[0]).other);
+        }
+        // The pension depends on the balance when it starts, which only earlier draws affect
+        const probe = runSimulation({ ...p, drawPre, drawPost: 0 });
+        const atPension = pick(probe.rows[Math.max(PENSION_AGE, p.startAge) - p.startAge]);
+        const drawPost = Math.max(0, income - atPension.pension - atPension.other);
+        return { drawPre, drawPost };
+    }
+
+    // Highest steady income that still lasts to the plan age (bisection: more income, earlier depletion)
+    function solveSustainableIncome(p) {
+        const trial = income => {
+            const draws = drawsForIncome(p, income);
+            return { ...draws, sim: runSimulation({ ...p, ...draws }) };
+        };
+        if (!lastsToPlanAge(trial(0).sim, p.planToAge)) return null;
+
+        let low = 0;
+        let high = 50000;
+        if (lastsToPlanAge(trial(high).sim, p.planToAge)) {
+            low = high;
+        } else {
+            for (let i = 0; i < 40; i++) {
+                const mid = (low + high) / 2;
+                if (lastsToPlanAge(trial(mid).sim, p.planToAge)) low = mid; else high = mid;
+            }
+        }
+
+        // Round down to $10 (and to the input limit) so the figures are tidy and still last
+        const best = trial(low);
+        let drawPre = Math.min(MAX_DRAW_INPUT, Math.floor(best.drawPre / 10) * 10);
+        let drawPost = Math.min(MAX_DRAW_INPUT, Math.floor(best.drawPost / 10) * 10);
+        let sim = runSimulation({ ...p, drawPre, drawPost });
+        for (let i = 0; i < 50 && !lastsToPlanAge(sim, p.planToAge); i++) {
+            drawPre = Math.max(0, drawPre - 10);
+            drawPost = Math.max(0, drawPost - 10);
+            sim = runSimulation({ ...p, drawPre, drawPost });
+        }
+        return { drawPre, drawPost, income: Math.floor(low / 10) * 10 };
+    }
+
+    function setDrawInputs(drawPre, drawPost) {
+        [['monthlyDrawPreNum', 'monthlyDrawPreSlider', drawPre], ['monthlyDrawPostNum', 'monthlyDrawPostSlider', drawPost]]
+            .forEach(([numId, sliderId, value]) => {
+                document.getElementById(numId).value = value;
+                document.getElementById(sliderId).value = value;
+            });
+    }
+
+    function showSolveMessage(text, withUndo) {
+        const box = document.getElementById('solveStatus');
+        box.textContent = text + ' ';
+        if (withUndo) {
+            const undo = document.createElement('button');
+            undo.type = 'button';
+            undo.className = 'btn-link';
+            undo.textContent = 'Undo';
+            undo.addEventListener('click', undoSolve);
+            box.appendChild(undo);
+        }
+    }
+
+    function solveDrawdown() {
+        const p = readInputs();
+        if (p.initial <= 0) return showSolveMessage('Enter a starting balance first.', false);
+        if (p.planToAge <= p.startAge) return showSolveMessage('Plan age must be after your starting age.', false);
+
+        const solved = solveSustainableIncome(p);
+        if (!solved) {
+            return showSolveMessage(`Super cannot last to age ${p.planToAge} even with no regular drawdown. Check any one-off withdrawals.`, false);
+        }
+
+        previousDraws = {
+            drawPre: document.getElementById('monthlyDrawPreNum').value,
+            drawPost: document.getElementById('monthlyDrawPostNum').value
+        };
+        // Before 67 only the 67+ amount applies when starting at 67 or later
+        setDrawInputs(p.startAge < PENSION_AGE ? solved.drawPre : previousDraws.drawPre, solved.drawPost);
+        calculate();
+
+        const unit = p.indexDraw ? " (today's dollars)" : '';
+        const income = `${formatCurrency(solved.income)} a month${unit}`;
+        const message = p.startAge < PENSION_AGE
+            ? `Set to ${formatCurrency(solved.drawPre)} a month from age ${p.startAge} and ${formatCurrency(solved.drawPost)} from 67, with the Age Pension making up the difference. Total income about ${income}, lasting to age ${p.planToAge}.`
+            : `Set to ${formatCurrency(solved.drawPost)} a month. With the Age Pension, total income is about ${income}, lasting to age ${p.planToAge}.`;
+        showSolveMessage(message, true);
+    }
+
+    function undoSolve() {
+        if (!previousDraws) return;
+        setDrawInputs(previousDraws.drawPre, previousDraws.drawPost);
+        previousDraws = null;
+        calculate();
+        showSolveMessage('Restored your previous amounts.', false);
+    }
+
+    // One-line recap shown on each collapsed section so its values stay visible
+    function updateSectionSummaries(p) {
+        const money = formatCurrency;
+        const text = (id, value) => { document.getElementById(id).textContent = value; };
+
+        text('sumAbout', `${p.status === 'couple' ? 'Couple' : 'Single'} · ${p.isHomeowner ? 'Homeowner' : 'Non-homeowner'} · Age ${p.startAge} · ${money(p.initial)}`);
+        text('sumDraw', (p.startAge < PENSION_AGE ? `${money(p.drawPre)}/mo, then ${money(p.drawPost)}/mo from 67` : `${money(p.drawPost)}/mo`) + ` · to age ${p.planToAge}`);
+        text('sumMarket', `${p.returnRate}% return · ${p.inflation}% inflation`);
+
+        const income = [];
+        if (p.workIncome > 0) income.push(`work ${money(p.workIncome)}`);
+        if (p.otherIncome > 0) income.push(`other ${money(p.otherIncome)}`);
+        text('sumWork', income.length ? income.join(' · ') + ' a month' : 'none');
+
+        text('sumOneOff', p.oneOffs.length ? `${p.oneOffs.length} planned` : 'none');
+        text('sumPension', `Threshold ${money(p.assetThreshold)} · other assets ${money(p.otherAssets)}`);
+    }
+
+    function updatePlanStatus(p, sim) {
+        const el = document.getElementById('planStatus');
+        if (p.initial === 0) {
+            el.textContent = '';
+        } else if (lastsToPlanAge(sim, p.planToAge)) {
+            el.textContent = `Super lasts to age ${p.planToAge} ✓`;
+            el.style.color = 'var(--secondary)';
+        } else {
+            el.textContent = `Super runs out at age ${sim.depletionAge}, before age ${p.planToAge}`;
+            el.style.color = '#dc2626';
+        }
+    }
+
+    // ---- Render --------------------------------------------------------------------------------
     function calculate() {
-		updateControlVisibility();
+        updateControlVisibility();
 
-		const startAge = parseInt(document.getElementById('startAgeNum').value) || 60;
-		const initial = parseFloat(document.getElementById('initialNum').value) || 0;
-		const monthlyDrawPre = parseFloat(document.getElementById('monthlyDrawPreNum').value) || 0;
-		const monthlyDrawPost = parseFloat(document.getElementById('monthlyDrawPostNum').value) || 0;
-		const returnRate = parseFloat(document.getElementById('returnRateNum').value) || 0;
-		const inflation = parseFloat(document.getElementById('inflationNum').value) || 0;
-		
-		const assetThreshold = parseFloat(document.getElementById('assetThresholdNum').value) || 0;
-		const projectedAssets = parseFloat(document.getElementById('projectedAssetsNum').value) || 0;
+        const p = readInputs();
+        const sim = runSimulation(p);
+        const lowSim = runSimulation({ ...p, returnRate: Math.max(0, p.returnRate - SCENARIO_RETURN_SPREAD) });
+        const highSim = runSimulation({ ...p, returnRate: p.returnRate + SCENARIO_RETURN_SPREAD });
+        const currentYear = new Date().getFullYear();
 
-		const monthlyReturn = (returnRate / 100) / 12;
-		const annualInflation = inflation / 100;
-		const currentYear = new Date().getFullYear();
+        // Summary cards describe the first year at or past pension age
+        const incomeAge = Math.max(PENSION_AGE, p.startAge);
+        const incomeRow = sim.rows[incomeAge - p.startAge];
+        const firstRow = sim.rows[0];
+        lastResult = { p, sim, incomeRow, incomeAge };
+        updatePlanStatus(p, sim);
+        updateSectionSummaries(p);
 
-		const labels = [];
-		const nominalData = [];
-		const realData = [];
-		const projectionTable = [];
+        // Charts (a saved comparison is overlaid, matched by age)
+        const labels = sim.rows.map(r => `Age ${r.age}`);
+        const savedSeries = key => savedScenario
+            ? sim.rows.map(r => (savedScenario.byAge[r.age] ? savedScenario.byAge[r.age][key] : null))
+            : [];
 
-		let currentBalance = initial;
-		let depletionAge = (initial === 0) ? startAge : null;
-		const maxProjectionYears = 40;
+        balanceChart.data.labels = labels;
+        balanceChart.data.datasets[0].data = sim.rows.map(r => r.nominalBalance);
+        balanceChart.data.datasets[1].data = sim.rows.map(r => r.realBalance);
+        balanceChart.data.datasets[2].data = savedSeries('realBalance');
+        balanceChart.update();
 
-		let fortnightlyPensionAt67 = 0;
-		let actualSuperDrawAt67 = 0;
-		const yearsUntil67 = Math.max(0, 67 - startAge);
+        incomeChart.data.labels = labels;
+        incomeChart.data.datasets[0].data = sim.rows.map(r => r.realSuperDraw);
+        incomeChart.data.datasets[1].data = sim.rows.map(r => r.realAgePension);
+        incomeChart.data.datasets[2].data = sim.rows.map(r => r.realWorkAndOtherIncome);
+        incomeChart.data.datasets[3].data = savedSeries('totalReal');
+        incomeChart.update();
 
-		for (let yr = 0; yr <= maxProjectionYears; yr++) {
-			const age = startAge + yr;
-			const yearVal = currentYear + yr;
-			labels.push(`Age ${age}`);
+        renderComparison({
+            realIncome: incomeRow.totalMonthlyIncomeReal,
+            realBalance: incomeRow.realBalance,
+            fortnightlyPension: incomeRow.fortnightlyAgePension,
+            depletionAge: sim.depletionAge || (p.startAge + MAX_PROJECTION_YEARS + 1),
+            depletionText: depletionText(sim, p)
+        });
 
-			if (currentBalance <= 0 && depletionAge === null && yr > 0) {
-				depletionAge = age;
-				currentBalance = 0;
-			}
+        document.getElementById('cardMonthlyDraw').textContent = formatCurrency(firstRow.monthlySuperDraw);
+        let drawSubtext;
+        if (p.initial === 0) drawSubtext = 'No Super Balance';
+        else if (firstRow.minimumDrawdownApplied) drawSubtext = 'Minimum drawdown applied';
+        else drawSubtext = p.startAge < PENSION_AGE ? `Ages ${p.startAge}–66 Draw` : 'Target Draw';
+        document.getElementById('cardDrawSubtext').textContent = drawSubtext;
 
-			const realVal = currentBalance / Math.pow(1 + annualInflation, yr);
-			nominalData.push(currentBalance);
-			realData.push(realVal);
+        document.getElementById('cardPensionLabel').textContent = `Fortnightly Pension (Age ${incomeAge})`;
+        document.getElementById('cardFortnightlyPension').textContent = formatCurrency(incomeRow.fortnightlyAgePension);
+        document.getElementById('cardPensionSubtext').textContent =
+            (p.startAge <= PENSION_AGE ? 'Starts at Age 67' : 'Current rate') + ` · ${incomeRow.pensionTest}`;
 
-			// Target draw based on age group
-			const targetMonthlyDraw = (age < 67) ? monthlyDrawPre : monthlyDrawPost;
-			
-			// Actual super drawdown is 0 if balance is 0
-			const actualMonthlyDraw = (currentBalance > 0) ? targetMonthlyDraw : 0;
+        document.getElementById('cardTotalLabel').textContent = `Total Monthly Income (Age ${incomeAge} Nominal)`;
+        document.getElementById('cardTotalMonthlyIncome').textContent = formatCurrency(incomeRow.totalMonthlyIncomeNominal);
 
-			// Age Pension is accessible at age 67+ regardless of super balance
-			let fortnightlyPension = 0;
-			if (age >= 67) {
-				const totalAssessable = currentBalance + projectedAssets;
-				fortnightlyPension = calculateAgePensionFortnightly(totalAssessable, assetThreshold, relationshipStatus);
-			}
+        document.getElementById('cardRealLabel').textContent = `Total Monthly Income (Today's ${currentYear} $)`;
+        document.getElementById('cardRealMonthlyIncome').textContent = formatCurrency(incomeRow.totalMonthlyIncomeReal);
+        document.getElementById('cardRealSubtext').textContent = `Inflation-adjusted at Age ${incomeAge}`;
 
-			if (age === 67) {
-				fortnightlyPensionAt67 = fortnightlyPension;
-				actualSuperDrawAt67 = actualMonthlyDraw;
-			}
+        document.getElementById('cardRealBalanceLabel').textContent = "Real Balance (Today's $)";
+        document.getElementById('cardRealBalance').textContent = formatCurrency(incomeRow.realBalance);
+        document.getElementById('cardRealBalanceSubtext').textContent = `Inflation-adjusted at Age ${incomeAge}`;
 
-			const monthlyAgePension = (fortnightlyPension * 26) / 12;
-			const totalMonthlyIncome = actualMonthlyDraw + monthlyAgePension;
-			const realMonthlyIncome = totalMonthlyIncome / Math.pow(1 + annualInflation, yr);
+        document.getElementById('cardDepletionAge').textContent =
+            (p.initial === 0) ? `Age ${p.startAge} ($0 initial)` : depletionText(sim, p);
+        document.getElementById('cardDepletionSubtext').textContent = (p.initial === 0)
+            ? 'Balance reaches $0'
+            : `Return −${SCENARIO_RETURN_SPREAD}%: ${depletionText(lowSim, p)} · +${SCENARIO_RETURN_SPREAD}%: ${depletionText(highSim, p)}`;
 
-			projectionTable.push({
-				year: yearVal,
-				age: age,
-				nominalBalance: Math.round(currentBalance * 100) / 100,
-				realPurchasingPower: Math.round(realVal * 100) / 100,
-				monthlySuperDraw: Math.round(actualMonthlyDraw * 100) / 100,
-				estimatedFortnightlyAgePension: Math.round(fortnightlyPension * 100) / 100,
-				totalMonthlyIncomeNominal: Math.round(totalMonthlyIncome * 100) / 100,
-				totalMonthlyIncomeInTodaysDollars: Math.round(realMonthlyIncome * 100) / 100
-			});
+        latestSimulationData = {
+            metadata: {
+                title: "Pension Drawdown & Age Pension Report",
+                generatedDate: new Date().toISOString().split('T')[0],
+                ageRatesAsAt: AGE_PENSION_RATES.asOf
+            },
+            inputParameters: collectInputParameters(),
+            summaryResultsAtPensionAge: {
+                ageUsed: incomeAge,
+                monthlySuperDrawdown: round2(incomeRow.monthlySuperDraw),
+                fortnightlyAgePension: round2(incomeRow.fortnightlyAgePension),
+                agePensionTestApplied: incomeRow.pensionTest,
+                totalMonthlyIncomeNominal: round2(incomeRow.totalMonthlyIncomeNominal),
+                totalMonthlyIncomeInTodaysDollars: round2(incomeRow.totalMonthlyIncomeReal),
+                realBalanceInTodaysDollars: round2(incomeRow.realBalance),
+                estimatedFundDepletionAge: (p.initial === 0) ? `Age ${p.startAge} ($0 initial)` : (sim.depletionAge || `${p.startAge + MAX_PROJECTION_YEARS}+`),
+                depletionAgeLowReturn: lowSim.depletionAge || `${p.startAge + MAX_PROJECTION_YEARS}+`,
+                depletionAgeHighReturn: highSim.depletionAge || `${p.startAge + MAX_PROJECTION_YEARS}+`
+            },
+            yearlyProjections: sim.rows.map(r => ({
+                year: r.year,
+                age: r.age,
+                nominalBalance: round2(r.nominalBalance),
+                realPurchasingPower: round2(r.realBalance),
+                oneOffWithdrawal: round2(r.oneOffWithdrawal),
+                monthlySuperDraw: round2(r.monthlySuperDraw),
+                minimumDrawdownApplied: r.minimumDrawdownApplied,
+                estimatedFortnightlyAgePension: round2(r.fortnightlyAgePension),
+                agePensionTestApplied: r.pensionTest,
+                monthlyWorkAndOtherIncome: round2(r.monthlyWorkAndOtherIncome),
+                totalMonthlyIncomeNominal: round2(r.totalMonthlyIncomeNominal),
+                totalMonthlyIncomeInTodaysDollars: round2(r.totalMonthlyIncomeReal)
+            }))
+        };
+    }
 
-			// Simulating 12 months of drawdown and growth
-			for (let m = 0; m < 12; m++) {
-				if (currentBalance > 0) {
-					currentBalance = (currentBalance - actualMonthlyDraw) * (1 + monthlyReturn);
-					if (currentBalance < 0) currentBalance = 0;
-				}
-			}
-		}
-
-		// Update Chart
-		chart.data.labels = labels;
-		chart.data.datasets[0].data = nominalData;
-		chart.data.datasets[1].data = realData;
-		chart.update();
-
-		// Summary Cards at Age 67
-		const activeTargetDraw = (startAge < 67) ? monthlyDrawPre : monthlyDrawPost;
-		const actualCurrentSuperDraw = (initial > 0) ? activeTargetDraw : 0;
-
-		const totalMonthlyAt67Nominal = actualSuperDrawAt67 + ((fortnightlyPensionAt67 * 26) / 12);
-		const totalMonthlyAt67Real = totalMonthlyAt67Nominal / Math.pow(1 + annualInflation, yearsUntil67);
-
-		document.getElementById('cardMonthlyDraw').textContent = formatCurrency(actualCurrentSuperDraw);
-		document.getElementById('cardDrawSubtext').textContent = (initial === 0) ? "No Super Balance" : (startAge < 67 ? "Ages 60–66 Draw" : "Target Draw");
-		
-		document.getElementById('cardFortnightlyPension').textContent = formatCurrency(fortnightlyPensionAt67);
-		document.getElementById('cardPensionSubtext').textContent = startAge <= 67 ? "Starts at Age 67" : "Current Rate";
-
-		document.getElementById('cardTotalMonthlyIncome').textContent = formatCurrency(totalMonthlyAt67Nominal);
-		document.getElementById('cardRealMonthlyIncome').textContent = formatCurrency(totalMonthlyAt67Real);
-		document.getElementById('cardDepletionAge').textContent = (initial === 0) ? "Age 60 ($0 initial)" : (depletionAge ? `Age ${depletionAge}` : 'Age 100+');
-
-		latestSimulationData = {
-			metadata: {
-				title: "Pension Drawdown & Age Pension Report",
-				generatedDate: new Date().toISOString().split('T')[0]
-			},
-			inputParameters: {
-				relationshipStatus: relationshipStatus,
-				isHomeowner: isHomeowner,
-				startingAge: startAge,
-				startingBalance: initial,
-				monthlyWithdrawalAges60To66: startAge < 67 ? monthlyDrawPre : "N/A",
-				monthlyWithdrawalAge67Plus: monthlyDrawPost,
-				investmentReturnPercent: returnRate,
-				inflationRatePercent: inflation,
-				assetThreshold: assetThreshold,
-				projectedOtherAssets: projectedAssets
-			},
-			summaryResultsAtAge67: {
-				monthlySuperDrawdown: Math.round(actualSuperDrawAt67 * 100) / 100,
-				fortnightlyAgePension: Math.round(fortnightlyPensionAt67 * 100) / 100,
-				totalMonthlyIncomeNominalAt67: Math.round(totalMonthlyAt67Nominal * 100) / 100,
-				totalMonthlyIncomeIn2026Dollars: Math.round(totalMonthlyAt67Real * 100) / 100,
-				estimatedFundDepletionAge: (initial === 0) ? "Age 60 ($0 initial)" : (depletionAge || "100+")
-			},
-			yearlyProjections: projectionTable
-		};
-	}
+    // ---- Export / import -----------------------------------------------------------------------
+    // Every input on the page, keyed the same way on export and import.
+    function collectInputParameters() {
+        const input = {
+            relationshipStatus: relationshipStatus,
+            isHomeowner: isHomeowner
+        };
+        controls.forEach(ctrl => { input[ctrl.key] = parseFloat(document.getElementById(ctrl.num).value) || 0; });
+        plainNumberInputs.forEach(item => { input[item.key] = parseFloat(document.getElementById(item.num).value) || 0; });
+        checkboxInputs.forEach(item => { input[item.key] = document.getElementById(item.id).checked; });
+        input.oneOffWithdrawals = oneOffs.map(o => ({ age: o.age, amount: o.amount }));
+        return input;
+    }
 
     function exportToJson() {
         if (!latestSimulationData) return;
@@ -634,41 +1415,109 @@
         downloadAnchor.remove();
     }
 
-    // Toggle Relationship Status
-    document.getElementById('btnSingle').addEventListener('click', () => {
-        relationshipStatus = 'single';
-        document.getElementById('btnSingle').classList.add('active');
-        document.getElementById('btnCouple').classList.remove('active');
-        updateThresholdFromToggles();
-        calculate();
-    });
+    // Applies only the `inputParameters` block of a previously exported file. Results, metadata and
+    // anything else in the file are ignored. Unknown, missing or wrongly-typed fields are skipped.
+    function importInputs(text) {
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            return { ok: false, message: 'Import failed: not a valid JSON file.' };
+        }
+        const input = (data && typeof data === 'object') ? data.inputParameters : null;
+        if (!input || typeof input !== 'object' || Array.isArray(input)) {
+            return { ok: false, message: 'Import failed: no input parameters found in file.' };
+        }
 
-    document.getElementById('btnCouple').addEventListener('click', () => {
-        relationshipStatus = 'couple';
-        document.getElementById('btnCouple').classList.add('active');
-        document.getElementById('btnSingle').classList.remove('active');
-        updateThresholdFromToggles();
-        calculate();
-    });
+        let applied = 0;
+        let togglesChanged = false;
 
-    // Toggle Homeowner Status
-    document.getElementById('btnHomeowner').addEventListener('click', () => {
-        isHomeowner = true;
-        document.getElementById('btnHomeowner').classList.add('active');
-        document.getElementById('btnNonHomeowner').classList.remove('active');
-        updateThresholdFromToggles();
-        calculate();
-    });
+        if (input.relationshipStatus === 'single' || input.relationshipStatus === 'couple') {
+            setRelationshipUI(input.relationshipStatus);
+            togglesChanged = true;
+            applied++;
+        }
+        if (typeof input.isHomeowner === 'boolean') {
+            setHomeownerUI(input.isHomeowner);
+            togglesChanged = true;
+            applied++;
+        }
 
-    document.getElementById('btnNonHomeowner').addEventListener('click', () => {
-        isHomeowner = false;
-        document.getElementById('btnNonHomeowner').classList.add('active');
-        document.getElementById('btnHomeowner').classList.remove('active');
-        updateThresholdFromToggles();
-        calculate();
-    });
+        const setNumber = (numId, sliderId, value) => {
+            if (typeof value !== 'number' || !isFinite(value)) return false;
+            const numEl = document.getElementById(numId);
+            const min = numEl.min !== '' ? parseFloat(numEl.min) : -Infinity;
+            const max = numEl.max !== '' ? parseFloat(numEl.max) : Infinity;
+            const clamped = Math.min(max, Math.max(min, value));
+            numEl.value = clamped;
+            if (sliderId) document.getElementById(sliderId).value = clamped;
+            return true;
+        };
 
-    // Bind sync listeners
+        controls.forEach(ctrl => { if (setNumber(ctrl.num, ctrl.slider, input[ctrl.key])) applied++; });
+        checkboxInputs.forEach(item => {
+            if (typeof input[item.key] === 'boolean') {
+                document.getElementById(item.id).checked = input[item.key];
+                applied++;
+            }
+        });
+
+        // Threshold last, so it overrides the default that the toggles set
+        const hasThreshold = typeof input.assetThreshold === 'number' && isFinite(input.assetThreshold);
+        if (togglesChanged && !hasThreshold) updateThresholdFromToggles();
+        plainNumberInputs.forEach(item => { if (setNumber(item.num, null, input[item.key])) applied++; });
+
+        if (Array.isArray(input.oneOffWithdrawals)) {
+            oneOffs = input.oneOffWithdrawals
+                .filter(o => o && typeof o.age === 'number' && isFinite(o.age) && typeof o.amount === 'number' && isFinite(o.amount))
+                .slice(0, MAX_ONE_OFFS)
+                .map(o => ({ age: Math.min(120, Math.max(60, Math.round(o.age))), amount: Math.min(5000000, Math.max(0, o.amount)) }));
+            renderOneOffs();
+            applied++;
+        }
+
+        if (applied === 0) {
+            return { ok: false, message: 'Import failed: no recognised input values in file.' };
+        }
+        openOptionalSectionsWithValues();
+        calculate();
+        return { ok: true, message: `Imported ${applied} input value${applied === 1 ? '' : 's'}.` };
+    }
+
+    function handleImportFile(file) {
+        const status = document.getElementById('importStatus');
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = importInputs(String(reader.result));
+            status.textContent = result.message;
+            status.style.color = result.ok ? 'var(--secondary)' : '#dc2626';
+        };
+        reader.onerror = () => {
+            status.textContent = 'Import failed: could not read file.';
+            status.style.color = '#dc2626';
+        };
+        reader.readAsText(file);
+    }
+
+    // ---- Toggles and wiring --------------------------------------------------------------------
+    function setRelationshipUI(status) {
+        relationshipStatus = status;
+        document.getElementById('btnSingle').classList.toggle('active', status === 'single');
+        document.getElementById('btnCouple').classList.toggle('active', status === 'couple');
+    }
+
+    function setHomeownerUI(value) {
+        isHomeowner = value;
+        document.getElementById('btnHomeowner').classList.toggle('active', value);
+        document.getElementById('btnNonHomeowner').classList.toggle('active', !value);
+    }
+
+    document.getElementById('btnSingle').addEventListener('click', () => { setRelationshipUI('single'); updateThresholdFromToggles(); calculate(); });
+    document.getElementById('btnCouple').addEventListener('click', () => { setRelationshipUI('couple'); updateThresholdFromToggles(); calculate(); });
+    document.getElementById('btnHomeowner').addEventListener('click', () => { setHomeownerUI(true); updateThresholdFromToggles(); calculate(); });
+    document.getElementById('btnNonHomeowner').addEventListener('click', () => { setHomeownerUI(false); updateThresholdFromToggles(); calculate(); });
+
     controls.forEach(ctrl => {
         const sliderEl = document.getElementById(ctrl.slider);
         const numEl = document.getElementById(ctrl.num);
@@ -676,9 +1525,25 @@
         numEl.addEventListener('input', () => { sliderEl.value = numEl.value; calculate(); });
     });
 
-    document.getElementById('assetThresholdNum').addEventListener('input', calculate);
-    document.getElementById('projectedAssetsNum').addEventListener('input', calculate);
+    plainNumberInputs.forEach(item => document.getElementById(item.num).addEventListener('input', calculate));
+    checkboxInputs.forEach(item => document.getElementById(item.id).addEventListener('change', calculate));
+
+    document.getElementById('btnSolveDraw').addEventListener('click', solveDrawdown);
+    document.getElementById('btnAddOneOff').addEventListener('click', addOneOff);
+    document.getElementById('btnCompare').addEventListener('click', () => {
+        if (savedScenario) savedScenario = null;
+        else saveComparison();
+        calculate();
+    });
+
+    document.getElementById('ratesAsAt').textContent = AGE_PENSION_RATES.asOf;
+
     document.getElementById('btnExportJson').addEventListener('click', exportToJson);
+    document.getElementById('btnImportJson').addEventListener('click', () => document.getElementById('importFile').click());
+    document.getElementById('importFile').addEventListener('change', event => {
+        handleImportFile(event.target.files[0]);
+        event.target.value = ''; // allow re-importing the same file
+    });
 
     calculate();
 </script>
