@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pension Fund Drawdown & Age Pension Simulator</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"
+            integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC"
+            crossorigin="anonymous"></script>
     <style>
         :root {
             --bg-color: #f8fafc;
@@ -458,6 +460,26 @@
 
                 <div class="control-group">
                     <div class="control-label">
+                        <span>Start Month (1 = Jan, 12 = Dec)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="startMonthSlider" min="1" max="12" step="1" value="1">
+                        <input type="number" id="startMonthNum" min="1" max="12" step="1" value="1">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
+                        <span>Birth Month (1 = Jan, 12 = Dec)</span>
+                    </div>
+                    <div class="input-row">
+                        <input type="range" id="birthMonthSlider" min="1" max="12" step="1" value="1">
+                        <input type="number" id="birthMonthNum" min="1" max="12" step="1" value="1">
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <div class="control-label">
                         <span>Starting Balance ($)</span>
                     </div>
                     <div class="input-row">
@@ -717,6 +739,8 @@
     // `key` is the name used for the field in the exported / imported JSON inputParameters.
     const controls = [
         { id: 'startAge',        slider: 'startAgeSlider',        num: 'startAgeNum',        key: 'startingAge' },
+        { id: 'startMonth',      slider: 'startMonthSlider',      num: 'startMonthNum',      key: 'startingMonth' },
+        { id: 'birthMonth',      slider: 'birthMonthSlider',      num: 'birthMonthNum',      key: 'birthMonth' },
         { id: 'initial',         slider: 'initialSlider',         num: 'initialNum',         key: 'startingBalance' },
         { id: 'monthlyDrawPre',  slider: 'monthlyDrawPreSlider',  num: 'monthlyDrawPreNum',  key: 'monthlyWithdrawalAges60To66' },
         { id: 'monthlyDrawPost', slider: 'monthlyDrawPostSlider', num: 'monthlyDrawPostNum', key: 'monthlyWithdrawalAge67Plus' },
@@ -910,6 +934,8 @@
             status: relationshipStatus,
             isHomeowner: isHomeowner,
             startAge: Math.min(80, Math.max(60, parseInt(document.getElementById('startAgeNum').value) || 60)),
+            startMonth: Math.min(12, Math.max(1, parseInt(document.getElementById('startMonthNum').value) || 1)),
+            birthMonth: Math.min(12, Math.max(1, parseInt(document.getElementById('birthMonthNum').value) || 1)),
             initial: readNonNegative('initialNum'),
             drawPre: readNonNegative('monthlyDrawPreNum'),
             drawPost: readNonNegative('monthlyDrawPostNum'),
@@ -935,13 +961,22 @@
         const annualInflation = p.inflation / 100;
         const currentYear = new Date().getFullYear();
 
+        // Rows are one per age, from each birthday. The first row is only the part of that age still to run
+        // after the start month (a birthday in the start month gives a full 12 months).
+        const monthsSinceBirthday = (p.startMonth - p.birthMonth + 12) % 12;
+        const firstRowMonths = 12 - monthsSinceBirthday;
+        const startIdx = currentYear * 12 + p.startMonth - 1;
+
         const rows = [];
         let balance = p.initial;
         let depletionAge = (p.initial === 0) ? p.startAge : null;
 
         for (let yr = 0; yr <= MAX_PROJECTION_YEARS; yr++) {
             const age = p.startAge + yr;
-            const inflationFactor = Math.pow(1 + annualInflation, yr);
+            const rowMonths = yr === 0 ? firstRowMonths : 12;
+            const elapsedMonths = yr === 0 ? 0 : firstRowMonths + (yr - 1) * 12;
+            const rowIdx = startIdx + elapsedMonths;
+            const inflationFactor = Math.pow(1 + annualInflation, elapsedMonths / 12);
             const drawIndex = p.indexDraw ? inflationFactor : 1;     // drawdown and one-offs
             const limitIndex = p.indexPension ? inflationFactor : 1; // pension limits and other income
 
@@ -965,14 +1000,14 @@
             // Run the year's 12 months up front so the draw reflects what is actually available
             let yearEndBalance = balanceAfterOneOff;
             let drawnThisYear = 0;
-            for (let m = 0; m < 12; m++) {
+            for (let m = 0; m < rowMonths; m++) {
                 if (yearEndBalance > 0) {
                     const draw = Math.min(plannedMonthlyDraw, yearEndBalance);
                     drawnThisYear += draw;
                     yearEndBalance = (yearEndBalance - draw) * (1 + monthlyReturn);
                 }
             }
-            const actualMonthlyDraw = drawnThisYear / 12;
+            const actualMonthlyDraw = drawnThisYear / rowMonths;
 
             // Work and other income (before tax); work stops at the chosen age
             const monthlyWork = (age < p.workUntilAge) ? p.workIncome * limitIndex : 0;
@@ -994,7 +1029,8 @@
             const totalMonthlyIncome = actualMonthlyDraw + monthlyAgePension + monthlyWork + monthlyOther;
 
             rows.push({
-                year: currentYear + yr,
+                year: Math.floor(rowIdx / 12),
+                month: rowIdx % 12 + 1,
                 age: age,
                 nominalBalance: balance,
                 realBalance: balance / inflationFactor,
@@ -1374,6 +1410,7 @@
             },
             yearlyProjections: sim.rows.map(r => ({
                 year: r.year,
+                month: r.month,
                 age: r.age,
                 nominalBalance: round2(r.nominalBalance),
                 realPurchasingPower: round2(r.realBalance),
@@ -1424,7 +1461,9 @@
         } catch (e) {
             return { ok: false, message: 'Import failed: not a valid JSON file.' };
         }
-        const input = (data && typeof data === 'object') ? data.inputParameters : null;
+        let input = (data && typeof data === 'object') ? data.inputParameters : null;
+        // A file downloaded from the combined calculator keeps this calculator's fields under "pension"
+        if (input && typeof input.pension === 'object' && input.pension) input = input.pension;
         if (!input || typeof input !== 'object' || Array.isArray(input)) {
             return { ok: false, message: 'Import failed: no input parameters found in file.' };
         }

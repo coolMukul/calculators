@@ -145,6 +145,9 @@
 .sup-scope details.input-section > summary:hover { background: var(--card-inner); }
 .sup-scope details.input-section > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .sup-scope .section-title { font-size: 0.95rem; font-weight: 700; }
+.sup-scope .who-row { display: flex; gap: 24px; margin-bottom: 8px; }
+.sup-scope .who-row label { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+.sup-scope .who-row input { margin: 0; accent-color: var(--primary); cursor: pointer; }
 .sup-scope .section-summary { font-size: 0.78rem; color: var(--text-muted); }
 .sup-scope .section-body { padding: 4px 14px 16px; }
 .sup-scope .control-label {
@@ -676,7 +679,13 @@
         <section class="sup-scope">
             <h2 class="section-heading">Super inputs</h2>
             <p class="section-intro">Growth up to retirement.</p>
-        <div class="panel" id="sup_controlsPanel"></div>
+        <div class="panel" id="sup_controlsPanel">
+            <div class="who-row">
+                <label><input type="checkbox" id="sup_chkYou" checked> You</label>
+                <label><input type="checkbox" id="sup_chkPartner"> Partner</label>
+            </div>
+            <p class="section-intro" id="sup_relNote" style="font-size: 0.85rem;"></p>
+        </div>
         </section>
         <section class="pen-scope">
             <h2 class="section-heading">Pension inputs</h2>
@@ -912,6 +921,14 @@
                     <div class="card-label" id="sup_lblNominal"></div>
                     <div class="card-value highlight" id="sup_cardNominal">$0</div>
                 </div>
+                <div class="card" id="sup_cardP1Wrap" hidden>
+                    <div class="card-label">You: Nominal Balance</div>
+                    <div class="card-value" id="sup_cardP1">$0</div>
+                </div>
+                <div class="card" id="sup_cardP2Wrap" hidden>
+                    <div class="card-label">Partner: Nominal Balance</div>
+                    <div class="card-value" id="sup_cardP2">$0</div>
+                </div>
                 <div class="card">
                     <div class="card-label">Real Value (Today's $)</div>
                     <div class="card-value real" id="sup_cardReal">$0</div>
@@ -988,6 +1005,10 @@
         // Applies only the fields present in params; returns { count, total, adjusted } or null if none matched
         importInputs(params) {
             return importInputs(params);
+        },
+        // The pension section owns the Single/Couple choice and tells this section about it
+        setCouple(value) {
+            setCouple(value);
         }
     };
 
@@ -1017,18 +1038,38 @@
 
     const MIN_START_YEAR = 2024;
     const MAX_START_YEAR = 2030;
+    const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Months are counted as year * 12 + (month - 1). Age at start is the age already reached in the start month,
+    // so a birthday that falls in the start month counts as having happened.
+    function buildTimeline(startYear, startMonth, startAge, birthMonth, retireAge) {
+        const startIdx = startYear * 12 + startMonth - 1;
+        const birthYear = startYear - startAge - (birthMonth > startMonth ? 1 : 0);
+        const birthIdx = birthYear * 12 + birthMonth - 1;
+        const retireIdx = (birthYear + retireAge) * 12 + birthMonth - 1;
+        return { startIdx, birthIdx, retireIdx, totalMonths: retireIdx - startIdx };
+    }
+    const monthLabel = idx => `${MONTH_NAMES[idx % 12]} ${Math.floor(idx / 12)}`;
 
     // ---- Accordion sections: each control names its section in "group" ----
     const GROUPS = [
-        { id: 'timeline',      title: 'Timeline' },
-        { id: 'contributions', title: 'Contributions' },
-        { id: 'investment',    title: 'Investment & Economy' }
+        { id: 'timeline',         title: 'Timeline' },
+        { id: 'timelineP2',       title: 'Timeline', partner: true },        // partner sections show only when the pension inputs say Couple
+        { id: 'contributions',    title: 'Contributions' },
+        { id: 'contributionsP2',  title: 'Contributions', partner: true },
+        { id: 'investment',       title: 'Investment & Economy' }
     ];
+    const COUPLE_SUFFIX_GROUPS = ['timeline', 'contributions'];   // these sections describe "you" once a partner is added
+
+    let isCouple = false;   // the Partner box: a partner is part of the projection (kept in step with the pension's Couple choice)
+    let youOn = true;       // the You box
 
     // ---- Control definitions: min/max are hard limits, sliderStep is coarser than the number input ----
     const CONTROLS = [
         { id: 'startYear', group: 'timeline',    label: 'Start Year',                       min: MIN_START_YEAR, max: MAX_START_YEAR, step: 1,   value: 2026, int: true },
-        { id: 'startAge', group: 'timeline',     label: 'Age at Start Year',                min: 18, max: 70, step: 1, value: 35, int: true },
+        { id: 'startMonth', group: 'timeline',   label: 'Start Month (1 = Jan, 12 = Dec)',  min: 1, max: 12, step: 1, value: 1, int: true },
+        { id: 'startAge', group: 'timeline',     label: 'Age at Start Date',                min: 18, max: 70, step: 1, value: 35, int: true },
+        { id: 'birthMonth', group: 'timeline',   label: 'Birth Month (1 = Jan, 12 = Dec)',  min: 1, max: 12, step: 1, value: 1, int: true },
         { id: 'retireAge', group: 'timeline',    label: 'Retirement Age',                   min: 55, max: 75, step: 1, value: 67, int: true },
         { id: 'initial', group: 'contributions',      label: 'Starting Balance ($)',             min: 0, max: 500000, step: 100, sliderStep: 1000, value: 100000 },
         { id: 'salary', group: 'contributions',       label: 'Annual Salary ($)',                min: 0, max: 500000, step: 1000, sliderStep: 1000, value: 100000 },
@@ -1041,6 +1082,17 @@
         { id: 'deductions', group: 'investment',   label: 'Fees & Earnings Tax (% p.a.)',     min: 0, max: 5,      step: 0.1, value: 1.5 },
         { id: 'inflation', group: 'investment',    label: 'Annual Inflation Rate (% p.a.)',   min: 0, max: 8,      step: 0.1, value: 2.5 }
     ];
+
+    // The partner has their own copy of every personal control. Start year and month, growth, fees and inflation stay shared.
+    const PERSON_IDS = ['startAge', 'birthMonth', 'retireAge', 'initial', 'salary', 'salaryGrowth', 'sgRate', 'salarySac', 'afterTax', 'contribYears'];
+    const PARTNER_DEFAULTS = { startAge: 33, initial: 60000, salary: 80000 };
+    const PARTNER_PREFIX = 'p2_';
+    const PARTNER_CONTROLS = PERSON_IDS.map(id => {
+        const base = CONTROLS.find(c => c.id === id);
+        const value = PARTNER_DEFAULTS[id] !== undefined ? PARTNER_DEFAULTS[id] : base.value;
+        return { ...base, id: PARTNER_PREFIX + id, group: base.group + 'P2', value };
+    });
+    const ALL_CONTROLS = CONTROLS.concat(PARTNER_CONTROLS);
 
     const currencyFmt = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD', maximumFractionDigits: 0 });
     const currencyFmtCents = new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' });
@@ -1074,10 +1126,10 @@
         details.appendChild(summary);
         details.appendChild(body);
         panel.appendChild(details);
-        sectionEls[g.id] = { details, summaryText, body };
+        sectionEls[g.id] = { details, title, summaryText, body };
     });
 
-    CONTROLS.forEach(c => {
+    ALL_CONTROLS.forEach(c => {
         const group = document.createElement('div');
         group.className = 'control-group';
         group.innerHTML = `
@@ -1105,55 +1157,116 @@
     }
 
     // One-line recap shown under each section title so collapsed sections still show their values.
-    function updateSectionSummaries(inp, netRatePct) {
+    function updateSectionSummaries(plan, netRatePct) {
         const pct = v => `${Number(v.toFixed(1))}%`;
+        const a = plan.you, b = isCouple ? plan.partner : null;
         const text = {
-            timeline:      `${inp.startYear} · age ${inp.startAge} to ${inp.retireAge} · contribute ${inp.contribYears} yrs`,
-            contributions: `${formatCurrency(inp.initial)} balance · ${formatCurrency(inp.salary)} salary · SG ${pct(inp.sgRate * 100)}`,
-            investment:    `${pct(inp.grossRate)} gross · ${pct(netRatePct)} net · ${pct(inp.inflation)} inflation`
+            timeline: `${MONTH_NAMES[plan.startMonth - 1]} ${plan.startYear} · age ${a.startAge} to ${a.retireAge} · contribute ${a.contribYears} yrs`,
+            contributions: `${formatCurrency(a.initial)} balance · ${formatCurrency(a.salary)} salary · SG ${pct(a.sgRate * 100)}`,
+            investment: `${pct(plan.grossRate)} gross · ${pct(netRatePct)} net · ${pct(plan.inflation)} inflation`,
+            timelineP2: b ? `age ${b.startAge} to ${b.retireAge} · contribute ${b.contribYears} yrs` : '',
+            contributionsP2: b ? `${formatCurrency(b.initial)} balance · ${formatCurrency(b.salary)} salary · SG ${pct(b.sgRate * 100)}` : ''
         };
         GROUPS.forEach(g => { sectionEls[g.id].summaryText.textContent = text[g.id]; });
     }
 
+    // Show the sections for whoever is ticked, and the cards that only apply to a couple.
+    function applyCoupleUI() {
+        GROUPS.forEach(g => {
+            const { details, title } = sectionEls[g.id];
+            if (g.id !== 'investment') {
+                details.hidden = g.partner ? !isCouple : !youOn;
+                if (details.hidden) details.open = false;
+            }
+            const suffix = !isCouple ? '' : g.partner ? ' (partner)' : COUPLE_SUFFIX_GROUPS.includes(g.id) ? ' (you)' : '';
+            title.textContent = g.title + suffix;
+        });
+        document.getElementById('sup_chkYou').checked = youOn;
+        document.getElementById('sup_chkPartner').checked = isCouple;
+        document.getElementById('sup_relNote').textContent = isCouple
+            ? 'Each person is projected separately, with their own caps and tax, and the balances are combined when the later of you retires.'
+            : 'Tick Partner to add a partner. This also switches the pension to Couple.';
+        document.getElementById('sup_cardP1Wrap').hidden = !isCouple;
+        document.getElementById('sup_cardP2Wrap').hidden = !isCouple;
+    }
+
+    // Called by the pension section when the Single/Couple choice changes.
+    function setCouple(value) {
+        value = !!value;
+        if (value === isCouple) return;
+        isCouple = value;
+        if (!isCouple) youOn = true;   // someone must stay in the projection
+        applyCoupleUI();
+        calculate();
+    }
+
     // Effective retirement age: never at or before the start age (the field itself is left alone while typing).
-    const effectiveRetireAge = () => Math.max(readValue('retireAge'), readValue('startAge') + 1);
+    const effectiveRetireAge = (prefix = '') => Math.max(readValue(prefix + 'retireAge'), readValue(prefix + 'startAge') + 1);
 
     // Contribution duration can never exceed the projection horizon.
     function syncLimits() {
-        const minRetire = Math.max(els.retireAge.def.min, readValue('startAge') + 1);
-        els.retireAge.slider.min = els.retireAge.num.min = minRetire;
+        ['', PARTNER_PREFIX].forEach(prefix => {
+            const minRetire = Math.max(els[prefix + 'retireAge'].def.min, readValue(prefix + 'startAge') + 1);
+            els[prefix + 'retireAge'].slider.min = els[prefix + 'retireAge'].num.min = minRetire;
 
-        const horizon = effectiveRetireAge() - readValue('startAge');
-        const { slider, num } = els.contribYears;
-        slider.max = num.max = horizon;
-        if (Number(num.value) > horizon) {
-            num.value = slider.value = horizon;
-        }
+            const person = readPerson(prefix);
+            const tl = buildTimeline(person.startYear, person.startMonth, person.startAge, person.birthMonth, person.retireAge);
+            const horizon = Math.ceil(tl.totalMonths / 12);
+            const { slider, num } = els[prefix + 'contribYears'];
+            slider.max = num.max = horizon;
+            if (Number(num.value) > horizon) {
+                num.value = slider.value = horizon;
+            }
+        });
     }
 
     // ---- Simulation ----
-    function readInputs() {
-        const startAge = readValue('startAge');
+    // A person carries the shared settings (start year, growth, fees, inflation) plus their own details.
+    function readPerson(prefix) {
+        const v = id => readValue(prefix + id);
         return {
             startYear:    readValue('startYear'),
-            startAge,
-            retireAge:    effectiveRetireAge(),
-            initial:      readValue('initial'),
-            salary:       readValue('salary'),
-            salaryGrowth: readValue('salaryGrowth') / 100,
-            sgRate:       readValue('sgRate') / 100,
-            salarySac:    readValue('salarySac'),
-            afterTax:     readValue('afterTax'),
-            contribYears: readValue('contribYears'),
+            startMonth:   readValue('startMonth'),
+            birthMonth:   v('birthMonth'),
+            startAge:     v('startAge'),
+            retireAge:    effectiveRetireAge(prefix),
+            initial:      v('initial'),
+            salary:       v('salary'),
+            salaryGrowth: v('salaryGrowth') / 100,
+            sgRate:       v('sgRate') / 100,
+            salarySac:    v('salarySac'),
+            afterTax:     v('afterTax'),
+            contribYears: v('contribYears'),
             grossRate:    readValue('grossRate'),
             deductions:   readValue('deductions'),
             inflation:    readValue('inflation')
         };
     }
 
-    // Pure year-by-year projection. grossRate is a parameter so scenario charts can re-run it at other rates.
-    function simulate(inp, grossRate) {
-        const totalYears = inp.retireAge - inp.startAge;
+    // plan.you / plan.partner hold every entered value; plan.people holds only the ticked people.
+    function readInputs() {
+        const you = readPerson('');
+        const partner = readPerson(PARTNER_PREFIX);
+        const people = [];
+        if (youOn) people.push({ ...you, key: 'you' });
+        if (isCouple) people.push({ ...partner, key: 'partner' });
+        return {
+            startYear:  readValue('startYear'),
+            startMonth: readValue('startMonth'),
+            grossRate:  readValue('grossRate'),
+            deductions: readValue('deductions'),
+            inflation:  readValue('inflation'),
+            you, partner, people
+        };
+    }
+
+    // Pure projection for one person, run month by month and reported in 12-month blocks counted from the start month
+    // (the last block may be shorter). grossRate is a parameter so scenario charts can re-run it at other rates.
+    // horizonMonths can run past the person's own retirement; the balance then keeps growing with no contributions.
+    function simulate(inp, grossRate, horizonMonths) {
+        const tl = buildTimeline(inp.startYear, inp.startMonth, inp.startAge, inp.birthMonth, inp.retireAge);
+        const totalMonths = horizonMonths !== undefined ? horizonMonths : tl.totalMonths;
+        const totalYears = Math.ceil(totalMonths / 12);   // number of blocks after the opening position
         const netRatePct = grossRate - inp.deductions;
         const monthlyRate = netRatePct / 100 / 12;   // may be negative if deductions > gross
         const annualInflation = inp.inflation / 100;
@@ -1166,13 +1279,24 @@
         const flags = { concExcessYear: null, afterTaxExcessYear: null, div293Year: null, listoYears: [], coConYears: [] };
 
         for (let yr = 0; yr <= totalYears; yr++) {
-            const year = inp.startYear + yr;
-            const age = inp.startAge + yr;
+            const elapsed = Math.min(yr * 12, totalMonths);          // months since the start month at the end of this block
+            const blockMonths = yr > 0 ? elapsed - (yr - 1) * 12 : 0;
+            const idx = tl.startIdx + elapsed;
+            const year = Math.floor(idx / 12);
+            const month = idx % 12 + 1;
+            const age = Math.floor((idx - tl.birthIdx) / 12);
+            const blockStartIdx = tl.startIdx + (yr - 1) * 12;
+            const blockYear = Math.floor(blockStartIdx / 12);          // calendar year the block begins in
+            const blockAge = Math.floor((blockStartIdx - tl.birthIdx) / 12);
+            // Months of this block that fall before this person's own retirement (the rest only earn growth)
+            const contribMonths = yr > 0 ? clamp(tl.totalMonths - (yr - 1) * 12, 0, blockMonths) : 0;
+            const share = contribMonths / 12;                          // part of a full year of contributions in this block
             const row = { salary: 0, concessional: 0, afterTax: 0, tax: 0, listo: 0, coCon: 0, net: 0 };
 
             if (yr > 0) {
-                // Contributions for this year, worked out once and paid in 12 equal monthly instalments.
-                if (yr <= inp.contribYears) {
+                // Contributions for this block, worked out as a full year and paid in equal monthly instalments
+                // (scaled down when the block is shorter than 12 months).
+                if (yr <= inp.contribYears && contribMonths > 0) {
                     row.salary = inp.salary * Math.pow(1 + inp.salaryGrowth, yr - 1);
                     const sg  = Math.min(row.salary, MAX_SG_BASE) * inp.sgRate;
                     const sac = Math.min(inp.salarySac, row.salary);
@@ -1190,45 +1314,81 @@
                     if (row.salary <= LISTO_THRESHOLD) {
                         row.listo = Math.min(LISTO_MAX, row.concessional * LISTO_RATE);
                         row.tax -= row.listo;
-                        if (row.listo > 0) flags.listoYears.push(year);
+                        if (row.listo > 0) flags.listoYears.push(blockYear);
                     }
 
                     // Government co-contribution matches personal after-tax contributions, phasing out
                     // by 1/30 of a dollar (500 over the 15,000 income band) per dollar above the lower threshold.
-                    if (age <= COCONTRIB_MAX_AGE && row.salary > 0 && row.salary < COCONTRIB_HIGHER) {
+                    if (blockAge <= COCONTRIB_MAX_AGE && row.salary > 0 && row.salary < COCONTRIB_HIGHER) {
                         const maxEntitlement = COCONTRIB_MAX * (COCONTRIB_HIGHER - Math.max(row.salary, COCONTRIB_LOWER))
                             / (COCONTRIB_HIGHER - COCONTRIB_LOWER);
                         row.coCon = Math.min(row.afterTax * COCONTRIB_MATCH, maxEntitlement);
-                        if (row.coCon > 0) flags.coConYears.push(year);
+                        if (row.coCon > 0) flags.coConYears.push(blockYear);
                     }
 
                     row.net = row.concessional - row.tax + row.afterTax + row.coCon;
 
-                    if (concWanted > CONCESSIONAL_CAP && flags.concExcessYear === null) flags.concExcessYear = year;
-                    if (inp.afterTax > NON_CONCESSIONAL_CAP && flags.afterTaxExcessYear === null) flags.afterTaxExcessYear = year;
-                    if (div293Portion > 0 && flags.div293Year === null) flags.div293Year = year;
+                    if (concWanted > CONCESSIONAL_CAP && flags.concExcessYear === null) flags.concExcessYear = blockYear;
+                    if (inp.afterTax > NON_CONCESSIONAL_CAP && flags.afterTaxExcessYear === null) flags.afterTaxExcessYear = blockYear;
+                    if (div293Portion > 0 && flags.div293Year === null) flags.div293Year = blockYear;
                 }
 
                 const monthlyAdd = row.net / 12;
-                for (let m = 0; m < 12; m++) {
+                for (let m = 0; m < blockMonths; m++) {
                     balance *= 1 + monthlyRate;
-                    balance += monthlyAdd;
+                    if (m < contribMonths) balance += monthlyAdd;
                 }
-                contributed += row.net;
-                taxPaid += row.tax;
-                govtTotal += row.coCon + row.listo;
+                contributed += row.net * share;
+                taxPaid += row.tax * share;
+                govtTotal += (row.coCon + row.listo) * share;
             }
 
-            const realValue = balance / Math.pow(1 + annualInflation, yr);
+            const realValue = balance / Math.pow(1 + annualInflation, elapsed / 12);
 
-            labels.push([String(year), 'Age ' + age]);
+            labels.push([MONTH_NAMES[month - 1] + ' ' + year, 'Age ' + age]);
             nominal.push(balance);
             real.push(realValue);
             contrib.push(contributed);
-            rows.push({ year, age, yr, ...row, contributed, balance, real: realValue });
+            rows.push({ year, month, age, yr, ...row, contributed, balance, real: realValue });
         }
 
-        return { labels, nominal, real, contrib, rows, taxPaid, govtTotal, flags, netRatePct, totalYears };
+        return { labels, nominal, real, contrib, rows, taxPaid, govtTotal, flags, netRatePct, totalYears, totalMonths, endIdx: tl.startIdx + totalMonths };
+    }
+
+    // Projects every person to the same end year (the later retirement) and adds them together.
+    const SUMMED_ROW_FIELDS = ['salary', 'concessional', 'afterTax', 'tax', 'listo', 'coCon', 'net', 'contributed', 'balance', 'real'];
+
+    function simulatePlan(plan, grossRate) {
+        const retireIdxs = plan.people.map(p => buildTimeline(p.startYear, p.startMonth, p.startAge, p.birthMonth, p.retireAge).retireIdx);
+        const endIdx = Math.max(...retireIdxs);
+        const totalMonths = endIdx - (plan.startYear * 12 + plan.startMonth - 1);
+        const totalYears = Math.ceil(totalMonths / 12);
+        const endYear = Math.floor(endIdx / 12);
+        const sims = plan.people.map((p, i) => ({ ...simulate(p, grossRate, totalMonths), key: p.key, retireIdx: retireIdxs[i] }));
+        const initial = plan.people.reduce((sum, p) => sum + p.initial, 0);
+        if (sims.length === 1) return { ...sims[0], people: sims, initial, endYear, endIdx };
+
+        const sumAt = (key, k) => sims.reduce((sum, s) => sum + s[key][k], 0);
+        const rows = sims[0].rows.map((row, k) => {
+            const combined = { year: row.year, month: row.month, age: row.age, partnerAge: sims[1].rows[k].age, yr: row.yr };
+            SUMMED_ROW_FIELDS.forEach(f => { combined[f] = sims.reduce((sum, s) => sum + s.rows[k][f], 0); });
+            return combined;
+        });
+        return {
+            labels: sims[0].rows.map((r, k) => [MONTH_NAMES[r.month - 1] + ' ' + r.year, `Age ${r.age} / ${sims[1].rows[k].age}`]),
+            nominal: sims[0].nominal.map((_, k) => sumAt('nominal', k)),
+            real: sims[0].real.map((_, k) => sumAt('real', k)),
+            contrib: sims[0].contrib.map((_, k) => sumAt('contrib', k)),
+            rows,
+            taxPaid: sims.reduce((sum, s) => sum + s.taxPaid, 0),
+            govtTotal: sims.reduce((sum, s) => sum + s.govtTotal, 0),
+            netRatePct: sims[0].netRatePct,
+            totalYears,
+            people: sims,
+            initial,
+            endYear,
+            endIdx
+        };
     }
 
     // ---- Charts: one view per dropdown entry, each built lazily the first time it is selected ----
@@ -1244,7 +1404,7 @@
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { position: 'bottom' },
+                legend: { position: 'bottom', labels: { filter: (item, data) => data.datasets[item.datasetIndex].data.length > 0 } },
                 tooltip: { callbacks: { label: moneyLabel } }
             },
             scales: {
@@ -1265,16 +1425,21 @@
                     datasets: [
                         { label: 'Nominal Balance ($)', data: [], borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.2 },
                         { label: "Real Purchasing Power (Today's $)", data: [], borderColor: '#059669', borderDash: [5, 5], backgroundColor: 'transparent', fill: false, tension: 0.2 },
-                        { label: 'Total Contributed, After Tax ($)', data: [], borderColor: '#94a3b8', borderWidth: 1.5, pointRadius: 0, backgroundColor: 'transparent', fill: false }
+                        { label: 'Total Contributed, After Tax ($)', data: [], borderColor: '#94a3b8', borderWidth: 1.5, pointRadius: 0, backgroundColor: 'transparent', fill: false },
+                        { label: 'You: Nominal Balance ($)', data: [], borderColor: '#7c3aed', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, backgroundColor: 'transparent', fill: false },
+                        { label: 'Partner: Nominal Balance ($)', data: [], borderColor: '#d97706', borderWidth: 1.5, borderDash: [2, 3], pointRadius: 0, backgroundColor: 'transparent', fill: false }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Balance ($)')
+                options: chartOptions('Date (Age)', 'Balance ($)')
             }),
             update(chart, sim) {
                 chart.data.labels = sim.labels;
                 chart.data.datasets[0].data = sim.nominal;
                 chart.data.datasets[1].data = sim.real;
                 chart.data.datasets[2].data = sim.contrib;
+                const split = sim.people.length > 1;
+                chart.data.datasets[3].data = split ? sim.people.find(p => p.key === 'you').nominal : [];
+                chart.data.datasets[4].data = split ? sim.people.find(p => p.key === 'partner').nominal : [];
             }
         },
 
@@ -1291,12 +1456,12 @@
                         { label: 'Investment Growth ($)', data: [], borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.35)', fill: '-1', pointRadius: 0 }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Balance ($)', { y: { stacked: true } })
+                options: chartOptions('Date (Age)', 'Balance ($)', { y: { stacked: true } })
             }),
-            update(chart, sim, inp) {
+            update(chart, sim) {
                 chart.data.labels = sim.labels;
-                chart.data.datasets[0].data = sim.labels.map(() => inp.initial);
-                chart.data.datasets[1].data = sim.contrib.map(c => c - inp.initial);
+                chart.data.datasets[0].data = sim.labels.map(() => sim.initial);
+                chart.data.datasets[1].data = sim.contrib.map(c => c - sim.initial);
                 chart.data.datasets[2].data = sim.nominal.map((b, k) => b - sim.contrib[k]);
             }
         },
@@ -1316,16 +1481,16 @@
                         { type: 'line', label: 'Concessional Cap ($)', data: [], borderColor: '#f59e0b', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Contributions ($)', { x: { stacked: true }, y: { stacked: true } })
+                options: chartOptions('Date (Age)', 'Contributions ($)', { x: { stacked: true }, y: { stacked: true } })
             }),
             update(chart, sim) {
                 const rows = sim.rows.slice(1);   // the first row is the opening position, not a contribution year
-                chart.data.labels = rows.map(r => r.year + ' (' + r.age + ')');
+                chart.data.labels = rows.map(r => MONTH_NAMES[r.month - 1] + ' ' + r.year + ' (' + r.age + (r.partnerAge !== undefined ? '/' + r.partnerAge : '') + ')');
                 chart.data.datasets[0].data = rows.map(r => round2(r.concessional - r.tax));
                 chart.data.datasets[1].data = rows.map(r => round2(r.tax));
                 chart.data.datasets[2].data = rows.map(r => round2(r.afterTax));
                 chart.data.datasets[3].data = rows.map(r => round2(r.coCon));
-                chart.data.datasets[4].data = rows.map(() => CONCESSIONAL_CAP);
+                chart.data.datasets[4].data = rows.map(() => CONCESSIONAL_CAP * sim.people.length);
             }
         },
 
@@ -1342,7 +1507,7 @@
                         { label: '', data: [], borderColor: '#059669', backgroundColor: 'transparent', borderDash: [5, 5], pointRadius: 0, tension: 0.2 }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Nominal Balance ($)')
+                options: chartOptions('Date (Age)', 'Nominal Balance ($)')
             }),
             update(chart, sim, inp) {
                 const rates = [Math.max(0, inp.grossRate - SCENARIO_SPREAD), inp.grossRate, inp.grossRate + SCENARIO_SPREAD];
@@ -1351,7 +1516,7 @@
                 rates.forEach((rate, k) => {
                     const ds = chart.data.datasets[k];
                     ds.label = `${names[k]} (${rate.toFixed(1)}% gross)`;
-                    ds.data = rate === inp.grossRate ? sim.nominal : simulate(inp, rate).nominal;
+                    ds.data = rate === inp.grossRate ? sim.nominal : simulatePlan(inp, rate).nominal;
                 });
             }
         }
@@ -1395,12 +1560,18 @@
         syncLimits();
 
         const inp = readInputs();
-        const sim = simulate(inp, inp.grossRate);
+        const sim = simulatePlan(inp, inp.grossRate);
         latest = { inp, sim };
 
-        const { startYear, startAge, retireAge, initial, salary, salarySac, afterTax, contribYears, grossRate, deductions, inflation } = inp;
-        const { totalYears, netRatePct, taxPaid, govtTotal, flags } = sim;
-        const endYear = startYear + totalYears;
+        const { startYear, startMonth, grossRate, deductions, inflation, people } = inp;
+        const { totalYears, netRatePct, taxPaid, govtTotal, endYear, endIdx } = sim;
+        const endLabel = monthLabel(endIdx);
+        const endMonth = endIdx % 12 + 1;
+        const lead = people[0];   // the first person in the projection; the pension section shows their age
+        // Age each person has reached at the end date (the earlier retiree keeps ageing until the later one retires)
+        const ageAtEnd = person => Math.floor((endIdx - buildTimeline(person.startYear, person.startMonth, person.startAge, person.birthMonth, person.retireAge).birthIdx) / 12);
+        const yourRetireAge = ageAtEnd(lead);
+        const simFor = key => sim.people[people.findIndex(p => p.key === key)];
 
         renderActiveChart();
         updateSectionSummaries(inp, netRatePct);
@@ -1410,30 +1581,40 @@
         const finalContrib = sim.contrib[totalYears];
 
         // ---- Warnings ----
-        const warnings = [];
-        if (retireAge < PRESERVATION_AGE) {
-            warnings.push(`Super is generally not accessible before age ${PRESERVATION_AGE} (preservation age), so retiring at ${retireAge} would need another condition of release.`);
-        }
-        if (flags.concExcessYear !== null) {
-            warnings.push(`Employer plus salary sacrifice contributions exceed the ${formatCurrency(CONCESSIONAL_CAP)} concessional cap from ${flags.concExcessYear}. The excess is excluded from this projection.`);
-        }
-        if (flags.afterTaxExcessYear !== null) {
-            warnings.push(`After-tax contributions exceed the ${formatCurrency(NON_CONCESSIONAL_CAP)} cap. The excess is excluded from this projection.`);
-        }
-        if (flags.div293Year !== null) {
-            warnings.push(`Division 293 applies from ${flags.div293Year}: concessional contributions on income above ${formatCurrency(DIV293_THRESHOLD)} are taxed at 30%.`);
-        }
-
-        // ---- Notes (informational) ----
+        // Caps, Division 293 and the income-tested offsets apply to each person separately.
         const yearSpan = ys => ys.length === 1 ? `${ys[0]}` : `${ys[0]} to ${ys[ys.length - 1]}`;
+        const warnings = [];
         const notes = [];
-        if (flags.listoYears.length) {
-            notes.push(`Low income super tax offset applies in ${yearSpan(flags.listoYears)} (salary at or below ${formatCurrency(LISTO_THRESHOLD)}): contributions tax is refunded up to ${formatCurrency(LISTO_MAX)} a year.`);
-        }
-        if (flags.coConYears.length) {
-            notes.push(`Government co-contribution applies in ${yearSpan(flags.coConYears)}: ${(COCONTRIB_MATCH * 100).toFixed(0)}c per $1 of personal after-tax contributions, up to ${formatCurrency(COCONTRIB_MAX)} a year, phasing out between ${formatCurrency(COCONTRIB_LOWER)} and ${formatCurrency(COCONTRIB_HIGHER)}.`);
-        } else if (afterTax === 0 && salary > 0 && salary < COCONTRIB_HIGHER && startAge <= COCONTRIB_MAX_AGE) {
-            notes.push(`For information: at this income level, a government co-contribution of up to ${formatCurrency(COCONTRIB_MAX)} a year is available on personal after-tax contributions. It is not included unless you enter an after-tax contribution amount.`);
+        people.forEach((person, i) => {
+            const who = isCouple ? (person.key === 'you' ? 'You: ' : 'Partner: ') : '';
+            const { flags } = sim.people[i];
+            if (person.retireAge < PRESERVATION_AGE) {
+                warnings.push(`${who}Super is generally not accessible before age ${PRESERVATION_AGE} (preservation age), so retiring at ${person.retireAge} would need another condition of release.`);
+            }
+            if (flags.concExcessYear !== null) {
+                warnings.push(`${who}Employer plus salary sacrifice contributions exceed the ${formatCurrency(CONCESSIONAL_CAP)} concessional cap from ${flags.concExcessYear}. The excess is excluded from this projection.`);
+            }
+            if (flags.afterTaxExcessYear !== null) {
+                warnings.push(`${who}After-tax contributions exceed the ${formatCurrency(NON_CONCESSIONAL_CAP)} cap. The excess is excluded from this projection.`);
+            }
+            if (flags.div293Year !== null) {
+                warnings.push(`${who}Division 293 applies from ${flags.div293Year}: concessional contributions on income above ${formatCurrency(DIV293_THRESHOLD)} are taxed at 30%.`);
+            }
+
+            if (flags.listoYears.length) {
+                notes.push(`${who}Low income super tax offset applies in ${yearSpan(flags.listoYears)} (salary at or below ${formatCurrency(LISTO_THRESHOLD)}): contributions tax is refunded up to ${formatCurrency(LISTO_MAX)} a year.`);
+            }
+            if (flags.coConYears.length) {
+                notes.push(`${who}Government co-contribution applies in ${yearSpan(flags.coConYears)}: ${(COCONTRIB_MATCH * 100).toFixed(0)}c per $1 of personal after-tax contributions, up to ${formatCurrency(COCONTRIB_MAX)} a year, phasing out between ${formatCurrency(COCONTRIB_LOWER)} and ${formatCurrency(COCONTRIB_HIGHER)}.`);
+            } else if (person.afterTax === 0 && person.salary > 0 && person.salary < COCONTRIB_HIGHER && person.startAge <= COCONTRIB_MAX_AGE) {
+                notes.push(`${who}For information: at this income level, a government co-contribution of up to ${formatCurrency(COCONTRIB_MAX)} a year is available on personal after-tax contributions. It is not included unless you enter an after-tax contribution amount.`);
+            }
+        });
+        if (people.length === 2) {
+            const retireYears = sim.people.map(s => monthLabel(s.retireIdx));
+            if (retireYears[0] !== retireYears[1]) {
+                notes.push(`You retire in ${retireYears[0]} and your partner in ${retireYears[1]}. The balances are combined in ${endLabel}, so the earlier retiree's super stays invested without further contributions until then.`);
+            }
         }
 
         const toBox = cls => text => {
@@ -1447,11 +1628,18 @@
             ...notes.map(toBox('warning note'))
         );
 
-        document.getElementById('sup_subtitle').textContent =
-            `Forecast balance from ${startYear} to ${endYear} (age ${startAge} to ${retireAge}) with Australian contribution tax, caps, inflation and fee modelling.`;
-        document.getElementById('sup_lblTarget').textContent = `Retirement (Age ${retireAge})`;
-        document.getElementById('sup_cardTarget').textContent = endYear;
-        document.getElementById('sup_lblNominal').textContent = `Nominal Balance (${endYear})`;
+        const combined = people.length === 2;
+        document.getElementById('sup_subtitle').textContent = combined
+            ? `Forecast combined balance for you and your partner from ${MONTH_NAMES[startMonth - 1]} ${startYear} to ${endLabel} (your age ${people[0].startAge} to ${ageAtEnd(people[0])}, partner age ${people[1].startAge} to ${ageAtEnd(people[1])}) with Australian contribution tax, caps, inflation and fee modelling.`
+            : `Forecast balance from ${MONTH_NAMES[startMonth - 1]} ${startYear} to ${endLabel} (age ${lead.startAge} to ${lead.retireAge}) with Australian contribution tax, caps, inflation and fee modelling.`;
+        document.getElementById('sup_lblTarget').textContent = combined ? `Combined at (Age ${ageAtEnd(people[0])} / ${ageAtEnd(people[1])})` : `Retirement (Age ${lead.retireAge})`;
+        if (isCouple) {
+            const show = key => simFor(key) ? formatCurrency(simFor(key).nominal[totalYears]) : 'Not included';
+            document.getElementById('sup_cardP1').textContent = show('you');
+            document.getElementById('sup_cardP2').textContent = show('partner');
+        }
+        document.getElementById('sup_cardTarget').textContent = endLabel;
+        document.getElementById('sup_lblNominal').textContent = `Nominal Balance (${endLabel})`;
         document.getElementById('sup_cardNetRate').textContent = netRatePct.toFixed(2) + '%';
         document.getElementById('sup_cardNominal').textContent = formatCurrency(finalNominal);
         document.getElementById('sup_cardReal').textContent = formatCurrency(finalReal);
@@ -1462,28 +1650,45 @@
         document.getElementById('sup_lblIncome').textContent = `Illustrative Income p.a. (${(DRAWDOWN_RATE * 100).toFixed(0)}% Drawdown, Today's $)`;
         document.getElementById('sup_cardIncome').textContent = formatCurrency(finalReal * DRAWDOWN_RATE);
 
-        emitResult({ nominalBalance: finalNominal, realBalance: finalReal, year: endYear, age: retireAge });
+        emitResult({ nominalBalance: finalNominal, realBalance: finalReal, year: endYear, month: endMonth, birthMonth: lead.birthMonth, age: yourRetireAge, couple: combined, ageOwner: lead.key === 'partner' ? "partner's age" : 'your age' });
 
+        // The partner's fields are always exported (from the saved values) so a Single/Couple switch loses nothing.
+        const you = inp.you, partner = inp.partner;
         latestSimulationData = {
             inputParameters: {
                 startYear,
-                startAge,
-                retirementAge: retireAge,
-                startingBalance: initial,
-                annualSalary: salary,
-                salaryGrowthPercent: round2(inp.salaryGrowth * 100),
-                employerSuperGuaranteePercent: round2(inp.sgRate * 100),
-                salarySacrificeAnnual: salarySac,
-                afterTaxContributionsAnnual: afterTax,
-                contributionDurationYears: contribYears,
+                startMonth,
+                startAge: you.startAge,
+                birthMonth: you.birthMonth,
+                retirementAge: you.retireAge,
+                startingBalance: you.initial,
+                annualSalary: you.salary,
+                salaryGrowthPercent: round2(you.salaryGrowth * 100),
+                employerSuperGuaranteePercent: round2(you.sgRate * 100),
+                salarySacrificeAnnual: you.salarySac,
+                afterTaxContributionsAnnual: you.afterTax,
+                contributionDurationYears: you.contribYears,
                 grossGrowthRatePercent: grossRate,
                 annualDeductionsPercent: deductions,
-                annualInflationRatePercent: inflation
+                annualInflationRatePercent: inflation,
+                partnerStartAge: partner.startAge,
+                partnerBirthMonth: partner.birthMonth,
+                partnerRetirementAge: partner.retireAge,
+                partnerStartingBalance: partner.initial,
+                partnerAnnualSalary: partner.salary,
+                partnerSalaryGrowthPercent: round2(partner.salaryGrowth * 100),
+                partnerEmployerSuperGuaranteePercent: round2(partner.sgRate * 100),
+                partnerSalarySacrificeAnnual: partner.salarySac,
+                partnerAfterTaxContributionsAnnual: partner.afterTax,
+                partnerContributionDurationYears: partner.contribYears,
+                includeYou: youOn
             },
-            yearlyProjections: sim.rows.map(r => ({
+            yearlyProjections: sim.rows.map((r, k) => ({
                 year: r.year,
+                month: r.month,
                 age: r.age,
-                isContributing: r.yr >= 1 && r.yr <= contribYears,
+                ...(r.partnerAge !== undefined ? { partnerAge: r.partnerAge } : {}),
+                isContributing: r.yr >= 1 && people.some(p => r.yr <= p.contribYears),
                 salary: round2(r.salary),
                 concessionalContributions: round2(r.concessional),
                 afterTaxContributions: round2(r.afterTax),
@@ -1492,7 +1697,11 @@
                 governmentCoContribution: round2(r.coCon),
                 totalContributionsAdded: round2(r.contributed),
                 nominalBalance: round2(r.balance),
-                realPurchasingPower: round2(r.real)
+                realPurchasingPower: round2(r.real),
+                ...(isCouple ? {
+                    yourNominalBalance: simFor('you') ? round2(simFor('you').rows[k].balance) : 0,
+                    partnerNominalBalance: simFor('partner') ? round2(simFor('partner').rows[k].balance) : 0
+                } : {})
             }))
         };
     }
@@ -1533,8 +1742,10 @@
             ]),
             ...section('Limitations that affect the result', [
                 'Caps and thresholds are not indexed, so in later years the result will differ from real rules, and benefits tied to income thresholds are understated for people whose pay rises.',
+                'Time runs month by month from the start month. Each person retires in the birth month of their retirement age, and the last year is part-year if that is not 12 months after the start. Salary growth and contribution amounts step up every 12 months from the start month, not on 1 July.',
                 'Contributions, salary growth and returns are smooth. Real markets are volatile and the order of returns matters.',
-                'Not included: the Age Pension, tax on withdrawals, carry-forward of unused concessional cap, insurance premiums, spouse contributions, and changes to the law.',
+                'Not included: the Age Pension (it is calculated in the pension section), tax on withdrawals, carry-forward of unused concessional cap, insurance premiums, spouse contributions and contribution splitting, and changes to the law.',
+                'Couples: each partner is projected separately with their own salary, caps, tax and offsets, and the two balances are added in the year the later partner retires. The earlier retiree\'s balance stays invested, with no further contributions, until then. The pension section treats the combined balance as one account and assumes both partners are at Age Pension age when you reach 67.',
                 'The government co-contribution is credited in the year of the contribution. In practice it is paid after your tax return is assessed, and other eligibility conditions apply.',
                 `The retirement income figure uses a fixed ${pct(DRAWDOWN_RATE)} yearly drawdown for illustration. It is not a prediction of what you could safely withdraw.`
             ])
@@ -1545,7 +1756,9 @@
     // Maps control id -> key inside "inputParameters" of the downloaded JSON.
     const IMPORT_KEYS = {
         startYear:    'startYear',
+        startMonth:   'startMonth',
         startAge:     'startAge',
+        birthMonth:   'birthMonth',
         retireAge:    'retirementAge',
         initial:      'startingBalance',
         salary:       'annualSalary',
@@ -1556,7 +1769,17 @@
         contribYears: 'contributionDurationYears',
         grossRate:    'grossGrowthRatePercent',
         deductions:   'annualDeductionsPercent',
-        inflation:    'annualInflationRatePercent'
+        inflation:    'annualInflationRatePercent',
+        p2_startAge:     'partnerStartAge',
+        p2_birthMonth:   'partnerBirthMonth',
+        p2_retireAge:    'partnerRetirementAge',
+        p2_initial:      'partnerStartingBalance',
+        p2_salary:       'partnerAnnualSalary',
+        p2_salaryGrowth: 'partnerSalaryGrowthPercent',
+        p2_sgRate:       'partnerEmployerSuperGuaranteePercent',
+        p2_salarySac:    'partnerSalarySacrificeAnnual',
+        p2_afterTax:     'partnerAfterTaxContributionsAnnual',
+        p2_contribYears: 'partnerContributionDurationYears'
     };
     function applyImportedInputs(params) {
         const imported = [];
@@ -1569,12 +1792,16 @@
                 imported.push(id);
             }
         });
+        if (typeof params.includeYou === 'boolean') {
+            youOn = params.includeYou;
+            imported.push(null);   // counted below, nothing to clamp
+        }
         if (imported.length === 0) return null;
 
         // Age/year limits drive the contribution-duration limit, so refresh them before clamping every field.
         syncLimits();
         let adjusted = 0;
-        imported.forEach(id => {
+        imported.filter(Boolean).forEach(id => {
             const v = readValue(id);
             if (v !== rawValues[id]) adjusted++;
             els[id].num.value = els[id].slider.value = v;
@@ -1585,6 +1812,7 @@
     function importInputs(params) {
         const result = applyImportedInputs(params);
         if (!result) return null;
+        applyCoupleUI();
         calculate();
         return { ...result, total: Object.keys(IMPORT_KEYS).length };
     }
@@ -1613,7 +1841,31 @@
         renderActiveChart();
     });
 
+    const relNote = document.getElementById('sup_relNote');
+    document.getElementById('sup_chkYou').addEventListener('change', e => {
+        if (!e.target.checked && !isCouple) {   // a partner-only projection needs the Partner box ticked first
+            e.target.checked = true;
+            relNote.textContent = 'Tick Partner first to leave yourself out.';
+            return;
+        }
+        youOn = e.target.checked;
+        applyCoupleUI();
+        calculate();
+    });
+    document.getElementById('sup_chkPartner').addEventListener('change', e => {
+        if (!e.target.checked && !youOn) {
+            e.target.checked = true;
+            relNote.textContent = 'Tick You first to leave your partner out.';
+            return;
+        }
+        const status = e.target.checked ? 'couple' : 'single';
+        // The pension section owns Single/Couple; it calls setCouple back, which recalculates
+        if (window.pensionProjection) window.pensionProjection.setRelationship(status);
+        else setCouple(e.target.checked);
+    });
+
     renderAssumptions();
+    applyCoupleUI();
     calculate();
 })();
 </script>
@@ -1852,6 +2104,9 @@
             status: relationshipStatus,
             isHomeowner: isHomeowner,
             startAge: Math.min(80, Math.max(60, parseInt(document.getElementById('pen_startAgeNum').value) || 60)),
+            startYear: linkedSuper ? linkedSuper.year : new Date().getFullYear(),   // date the pension section starts (super retirement)
+            startMonth: linkedSuper ? linkedSuper.month : 1,
+            birthMonth: linkedSuper ? linkedSuper.birthMonth : 1,
             initial: readNonNegative('pen_initialNum'),
             drawPre: readNonNegative('pen_monthlyDrawPreNum'),
             drawPost: readNonNegative('pen_monthlyDrawPostNum'),
@@ -1878,13 +2133,22 @@
         const annualInflation = p.inflation / 100;
         const currentYear = new Date().getFullYear();
 
+        // Rows are one per age, from each birthday. The first row is only the part of that age still to run
+        // after the start month (a birthday in the start month gives a full 12 months).
+        const monthsSinceBirthday = (p.startMonth - p.birthMonth + 12) % 12;
+        const firstRowMonths = 12 - monthsSinceBirthday;
+        const startIdx = p.startYear * 12 + p.startMonth - 1;
+
         const rows = [];
         let balance = p.initial;
         let depletionAge = (p.initial === 0) ? p.startAge : null;
 
         for (let yr = 0; yr <= MAX_PROJECTION_YEARS; yr++) {
             const age = p.startAge + yr;
-            const inflationFactor = Math.pow(1 + annualInflation, yr);
+            const rowMonths = yr === 0 ? firstRowMonths : 12;
+            const elapsedMonths = yr === 0 ? 0 : firstRowMonths + (yr - 1) * 12;
+            const rowIdx = startIdx + elapsedMonths;
+            const inflationFactor = Math.pow(1 + annualInflation, elapsedMonths / 12);
             const drawIndex = p.indexDraw ? inflationFactor : 1;     // drawdown and one-offs
             const limitIndex = p.indexPension ? inflationFactor : 1; // pension limits and other income
 
@@ -1929,19 +2193,20 @@
             // Run the year's 12 months up front so the draw reflects what is actually available
             let yearEndBalance = balanceAfterOneOff;
             let drawnThisYear = 0;
-            for (let m = 0; m < 12; m++) {
+            for (let m = 0; m < rowMonths; m++) {
                 if (yearEndBalance > 0) {
                     const draw = Math.min(plannedMonthlyDraw, yearEndBalance);
                     drawnThisYear += draw;
                     yearEndBalance = (yearEndBalance - draw) * (1 + monthlyReturn);
                 }
             }
-            const actualMonthlyDraw = drawnThisYear / 12;
+            const actualMonthlyDraw = drawnThisYear / rowMonths;
 
             const totalMonthlyIncome = actualMonthlyDraw + monthlyAgePension + monthlyWork + monthlyOther;
 
             rows.push({
-                year: currentYear + yr,
+                year: Math.floor(rowIdx / 12),
+                month: rowIdx % 12 + 1,
                 age: age,
                 nominalBalance: balance,
                 realBalance: balance / inflationFactor,
@@ -2260,7 +2525,9 @@
         // Both balance cards show the super balance handed over at retirement (same figures as the Super section)
         if (linkedSuper) {
             document.getElementById('pen_cardNominalBalance').textContent = formatCurrency(linkedSuper.nominalBalance);
-            document.getElementById('pen_cardNominalBalanceSubtext').textContent = `Super at retirement (${linkedSuper.year}, age ${linkedSuper.age})`;
+            document.getElementById('pen_cardNominalBalanceSubtext').textContent = linkedSuper.couple
+                ? `Combined super at ${linkedDate()} (${linkedSuper.ageOwner} ${linkedSuper.age})`
+                : `Super at retirement (${linkedDate()}, age ${linkedSuper.age})`;
         }
 
         document.getElementById('pen_cardRealBalanceLabel').textContent = "Real Balance (Today's $)";
@@ -2279,6 +2546,7 @@
             inputParameters: collectInputParameters(),
             yearlyProjections: sim.rows.map(r => ({
                 year: r.year,
+                month: r.month,
                 age: r.age,
                 nominalBalance: round2(r.nominalBalance),
                 realPurchasingPower: round2(r.realBalance),
@@ -2370,6 +2638,8 @@
         relationshipStatus = status;
         document.getElementById('pen_btnSingle').classList.toggle('active', status === 'single');
         document.getElementById('pen_btnCouple').classList.toggle('active', status === 'couple');
+        // The super section adds or removes the partner; it recalculates and hands the balance back
+        if (window.superProjection) window.superProjection.setCouple(status === 'couple');
     }
 
     function setHomeownerUI(value) {
@@ -2403,7 +2673,8 @@
     document.getElementById('ratesAsAt').textContent = AGE_PENSION_RATES.asOf;
 
     // ---- Link to the super inputs: the starting balance is the nominal balance at retirement ----
-    let linkedSuper = null;   // { nominalBalance, year, age }
+    let linkedSuper = null;   // { nominalBalance, year, month, birthMonth, age }
+    const linkedDate = () => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][linkedSuper.month - 1] + ' ' + linkedSuper.year;
 
     function updateBalanceNote(startAge) {
         const note = document.getElementById('pen_initialNote');
@@ -2411,7 +2682,9 @@
             note.textContent = 'Waiting for the super projection.';
             return;
         }
-        let text = `From the Super inputs: nominal balance at retirement (${linkedSuper.year}, age ${linkedSuper.age}).`;
+        let text = linkedSuper.couple
+            ? `From the Super inputs: both partners' super combined at ${linkedDate()} (${linkedSuper.ageOwner} ${linkedSuper.age}).`
+            : `From the Super inputs: nominal balance at retirement (${linkedDate()}, age ${linkedSuper.age}).`;
         if (startAge !== linkedSuper.age) {
             text += ` Starting Age here is ${startAge}, not ${linkedSuper.age}.`;
         }
@@ -2423,7 +2696,13 @@
         exportData() {
             return latestSimulationData && { inputs: latestSimulationData.inputParameters, rows: latestSimulationData.yearlyProjections };
         },
-        importInputs
+        importInputs,
+        // Used by the super section's Partner box
+        setRelationship(status) {
+            setRelationshipUI(status);
+            updateThresholdFromToggles();
+            calculate();
+        }
     };
 
     if (window.superProjection) {

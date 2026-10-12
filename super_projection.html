@@ -383,6 +383,18 @@
 
     const MIN_START_YEAR = 2024;
     const MAX_START_YEAR = 2030;
+    const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Months are counted as year * 12 + (month - 1). Age at start is the age already reached in the start month,
+    // so a birthday that falls in the start month counts as having happened.
+    function buildTimeline(startYear, startMonth, startAge, birthMonth, retireAge) {
+        const startIdx = startYear * 12 + startMonth - 1;
+        const birthYear = startYear - startAge - (birthMonth > startMonth ? 1 : 0);
+        const birthIdx = birthYear * 12 + birthMonth - 1;
+        const retireIdx = (birthYear + retireAge) * 12 + birthMonth - 1;
+        return { startIdx, birthIdx, retireIdx, totalMonths: retireIdx - startIdx };
+    }
+    const monthLabel = idx => `${MONTH_NAMES[idx % 12]} ${Math.floor(idx / 12)}`;
 
     // ---- Accordion sections: each control names its section in "group" ----
     const GROUPS = [
@@ -394,7 +406,9 @@
     // ---- Control definitions: min/max are hard limits, sliderStep is coarser than the number input ----
     const CONTROLS = [
         { id: 'startYear', group: 'timeline',    label: 'Start Year',                       min: MIN_START_YEAR, max: MAX_START_YEAR, step: 1,   value: 2026, int: true },
-        { id: 'startAge', group: 'timeline',     label: 'Age at Start Year',                min: 18, max: 70, step: 1, value: 35, int: true },
+        { id: 'startMonth', group: 'timeline',   label: 'Start Month (1 = Jan, 12 = Dec)',  min: 1, max: 12, step: 1, value: 1, int: true },
+        { id: 'startAge', group: 'timeline',     label: 'Age at Start Date',                min: 18, max: 70, step: 1, value: 35, int: true },
+        { id: 'birthMonth', group: 'timeline',   label: 'Birth Month (1 = Jan, 12 = Dec)',  min: 1, max: 12, step: 1, value: 1, int: true },
         { id: 'retireAge', group: 'timeline',    label: 'Retirement Age',                   min: 55, max: 75, step: 1, value: 67, int: true },
         { id: 'initial', group: 'contributions',      label: 'Starting Balance ($)',             min: 0, max: 500000, step: 100, sliderStep: 1000, value: 100000 },
         { id: 'salary', group: 'contributions',       label: 'Annual Salary ($)',                min: 0, max: 500000, step: 1000, sliderStep: 1000, value: 100000 },
@@ -474,7 +488,7 @@
     function updateSectionSummaries(inp, netRatePct) {
         const pct = v => `${Number(v.toFixed(1))}%`;
         const text = {
-            timeline:      `${inp.startYear} · age ${inp.startAge} to ${inp.retireAge} · contribute ${inp.contribYears} yrs`,
+            timeline:      `${MONTH_NAMES[inp.startMonth - 1]} ${inp.startYear} · age ${inp.startAge} to ${inp.retireAge} · contribute ${inp.contribYears} yrs`,
             contributions: `${formatCurrency(inp.initial)} balance · ${formatCurrency(inp.salary)} salary · SG ${pct(inp.sgRate * 100)}`,
             investment:    `${pct(inp.grossRate)} gross · ${pct(netRatePct)} net · ${pct(inp.inflation)} inflation`
         };
@@ -489,7 +503,9 @@
         const minRetire = Math.max(els.retireAge.def.min, readValue('startAge') + 1);
         els.retireAge.slider.min = els.retireAge.num.min = minRetire;
 
-        const horizon = effectiveRetireAge() - readValue('startAge');
+        const inp = readInputs();
+        const tl = buildTimeline(inp.startYear, inp.startMonth, inp.startAge, inp.birthMonth, inp.retireAge);
+        const horizon = Math.ceil(tl.totalMonths / 12);
         const { slider, num } = els.contribYears;
         slider.max = num.max = horizon;
         if (Number(num.value) > horizon) {
@@ -502,6 +518,8 @@
         const startAge = readValue('startAge');
         return {
             startYear:    readValue('startYear'),
+            startMonth:   readValue('startMonth'),
+            birthMonth:   readValue('birthMonth'),
             startAge,
             retireAge:    effectiveRetireAge(),
             initial:      readValue('initial'),
@@ -517,9 +535,12 @@
         };
     }
 
-    // Pure year-by-year projection. grossRate is a parameter so scenario charts can re-run it at other rates.
+    // Pure projection run month by month, reported in 12-month blocks counted from the start month (the last block
+    // may be shorter). grossRate is a parameter so scenario charts can re-run it at other rates.
     function simulate(inp, grossRate) {
-        const totalYears = inp.retireAge - inp.startAge;
+        const tl = buildTimeline(inp.startYear, inp.startMonth, inp.startAge, inp.birthMonth, inp.retireAge);
+        const totalMonths = tl.totalMonths;
+        const totalYears = Math.ceil(totalMonths / 12);   // number of blocks after the opening position
         const netRatePct = grossRate - inp.deductions;
         const monthlyRate = netRatePct / 100 / 12;   // may be negative if deductions > gross
         const annualInflation = inp.inflation / 100;
@@ -532,12 +553,21 @@
         const flags = { concExcessYear: null, afterTaxExcessYear: null, div293Year: null, listoYears: [], coConYears: [] };
 
         for (let yr = 0; yr <= totalYears; yr++) {
-            const year = inp.startYear + yr;
-            const age = inp.startAge + yr;
+            const elapsed = Math.min(yr * 12, totalMonths);          // months since the start month at the end of this block
+            const blockMonths = yr > 0 ? elapsed - (yr - 1) * 12 : 0;
+            const idx = tl.startIdx + elapsed;
+            const year = Math.floor(idx / 12);
+            const month = idx % 12 + 1;
+            const age = Math.floor((idx - tl.birthIdx) / 12);
+            const blockStartIdx = tl.startIdx + (yr - 1) * 12;
+            const blockYear = Math.floor(blockStartIdx / 12);          // calendar year the block begins in
+            const blockAge = Math.floor((blockStartIdx - tl.birthIdx) / 12);
+            const share = blockMonths / 12;                            // part of a full year this block covers
             const row = { salary: 0, concessional: 0, afterTax: 0, tax: 0, listo: 0, coCon: 0, net: 0 };
 
             if (yr > 0) {
-                // Contributions for this year, worked out once and paid in 12 equal monthly instalments.
+                // Contributions for this block, worked out as a full year and paid in equal monthly instalments
+                // (scaled down when the final block is shorter than 12 months).
                 if (yr <= inp.contribYears) {
                     row.salary = inp.salary * Math.pow(1 + inp.salaryGrowth, yr - 1);
                     const sg  = Math.min(row.salary, MAX_SG_BASE) * inp.sgRate;
@@ -556,45 +586,45 @@
                     if (row.salary <= LISTO_THRESHOLD) {
                         row.listo = Math.min(LISTO_MAX, row.concessional * LISTO_RATE);
                         row.tax -= row.listo;
-                        if (row.listo > 0) flags.listoYears.push(year);
+                        if (row.listo > 0) flags.listoYears.push(blockYear);
                     }
 
                     // Government co-contribution matches personal after-tax contributions, phasing out
                     // by 1/30 of a dollar (500 over the 15,000 income band) per dollar above the lower threshold.
-                    if (age <= COCONTRIB_MAX_AGE && row.salary > 0 && row.salary < COCONTRIB_HIGHER) {
+                    if (blockAge <= COCONTRIB_MAX_AGE && row.salary > 0 && row.salary < COCONTRIB_HIGHER) {
                         const maxEntitlement = COCONTRIB_MAX * (COCONTRIB_HIGHER - Math.max(row.salary, COCONTRIB_LOWER))
                             / (COCONTRIB_HIGHER - COCONTRIB_LOWER);
                         row.coCon = Math.min(row.afterTax * COCONTRIB_MATCH, maxEntitlement);
-                        if (row.coCon > 0) flags.coConYears.push(year);
+                        if (row.coCon > 0) flags.coConYears.push(blockYear);
                     }
 
                     row.net = row.concessional - row.tax + row.afterTax + row.coCon;
 
-                    if (concWanted > CONCESSIONAL_CAP && flags.concExcessYear === null) flags.concExcessYear = year;
-                    if (inp.afterTax > NON_CONCESSIONAL_CAP && flags.afterTaxExcessYear === null) flags.afterTaxExcessYear = year;
-                    if (div293Portion > 0 && flags.div293Year === null) flags.div293Year = year;
+                    if (concWanted > CONCESSIONAL_CAP && flags.concExcessYear === null) flags.concExcessYear = blockYear;
+                    if (inp.afterTax > NON_CONCESSIONAL_CAP && flags.afterTaxExcessYear === null) flags.afterTaxExcessYear = blockYear;
+                    if (div293Portion > 0 && flags.div293Year === null) flags.div293Year = blockYear;
                 }
 
                 const monthlyAdd = row.net / 12;
-                for (let m = 0; m < 12; m++) {
+                for (let m = 0; m < blockMonths; m++) {
                     balance *= 1 + monthlyRate;
                     balance += monthlyAdd;
                 }
-                contributed += row.net;
-                taxPaid += row.tax;
-                govtTotal += row.coCon + row.listo;
+                contributed += row.net * share;
+                taxPaid += row.tax * share;
+                govtTotal += (row.coCon + row.listo) * share;
             }
 
-            const realValue = balance / Math.pow(1 + annualInflation, yr);
+            const realValue = balance / Math.pow(1 + annualInflation, elapsed / 12);
 
-            labels.push([String(year), 'Age ' + age]);
+            labels.push([MONTH_NAMES[month - 1] + ' ' + year, 'Age ' + age]);
             nominal.push(balance);
             real.push(realValue);
             contrib.push(contributed);
-            rows.push({ year, age, yr, ...row, contributed, balance, real: realValue });
+            rows.push({ year, month, age, yr, ...row, contributed, balance, real: realValue });
         }
 
-        return { labels, nominal, real, contrib, rows, taxPaid, govtTotal, flags, netRatePct, totalYears };
+        return { labels, nominal, real, contrib, rows, taxPaid, govtTotal, flags, netRatePct, totalYears, totalMonths, endIdx: tl.retireIdx };
     }
 
     // ---- Charts: one view per dropdown entry, each built lazily the first time it is selected ----
@@ -634,7 +664,7 @@
                         { label: 'Total Contributed, After Tax ($)', data: [], borderColor: '#94a3b8', borderWidth: 1.5, pointRadius: 0, backgroundColor: 'transparent', fill: false }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Balance ($)')
+                options: chartOptions('Date (Age)', 'Balance ($)')
             }),
             update(chart, sim) {
                 chart.data.labels = sim.labels;
@@ -657,7 +687,7 @@
                         { label: 'Investment Growth ($)', data: [], borderColor: '#059669', backgroundColor: 'rgba(5, 150, 105, 0.35)', fill: '-1', pointRadius: 0 }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Balance ($)', { y: { stacked: true } })
+                options: chartOptions('Date (Age)', 'Balance ($)', { y: { stacked: true } })
             }),
             update(chart, sim, inp) {
                 chart.data.labels = sim.labels;
@@ -682,11 +712,11 @@
                         { type: 'line', label: 'Concessional Cap ($)', data: [], borderColor: '#f59e0b', borderDash: [6, 4], borderWidth: 2, pointRadius: 0, fill: false }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Contributions ($)', { x: { stacked: true }, y: { stacked: true } })
+                options: chartOptions('Date (Age)', 'Contributions ($)', { x: { stacked: true }, y: { stacked: true } })
             }),
             update(chart, sim) {
                 const rows = sim.rows.slice(1);   // the first row is the opening position, not a contribution year
-                chart.data.labels = rows.map(r => r.year + ' (' + r.age + ')');
+                chart.data.labels = rows.map(r => MONTH_NAMES[r.month - 1] + ' ' + r.year + ' (' + r.age + ')');
                 chart.data.datasets[0].data = rows.map(r => round2(r.concessional - r.tax));
                 chart.data.datasets[1].data = rows.map(r => round2(r.tax));
                 chart.data.datasets[2].data = rows.map(r => round2(r.afterTax));
@@ -708,7 +738,7 @@
                         { label: '', data: [], borderColor: '#059669', backgroundColor: 'transparent', borderDash: [5, 5], pointRadius: 0, tension: 0.2 }
                     ]
                 },
-                options: chartOptions('Year (Age)', 'Nominal Balance ($)')
+                options: chartOptions('Date (Age)', 'Nominal Balance ($)')
             }),
             update(chart, sim, inp) {
                 const rates = [Math.max(0, inp.grossRate - SCENARIO_SPREAD), inp.grossRate, inp.grossRate + SCENARIO_SPREAD];
@@ -764,9 +794,10 @@
         const sim = simulate(inp, inp.grossRate);
         latest = { inp, sim };
 
-        const { startYear, startAge, retireAge, initial, salary, salarySac, afterTax, contribYears, grossRate, deductions, inflation } = inp;
+        const { startYear, startMonth, birthMonth, startAge, retireAge, initial, salary, salarySac, afterTax, contribYears, grossRate, deductions, inflation } = inp;
         const { totalYears, netRatePct, taxPaid, govtTotal, flags } = sim;
-        const endYear = startYear + totalYears;
+        const endYear = Math.floor(sim.endIdx / 12);
+        const endLabel = monthLabel(sim.endIdx);
 
         renderActiveChart();
         updateSectionSummaries(inp, netRatePct);
@@ -814,10 +845,10 @@
         );
 
         document.getElementById('subtitle').textContent =
-            `Forecast balance from ${startYear} to ${endYear} (age ${startAge} to ${retireAge}) with Australian contribution tax, caps, inflation and fee modelling.`;
+            `Forecast balance from ${MONTH_NAMES[startMonth - 1]} ${startYear} to ${endLabel} (age ${startAge} to ${retireAge}) with Australian contribution tax, caps, inflation and fee modelling.`;
         document.getElementById('lblTarget').textContent = `Retirement (Age ${retireAge})`;
-        document.getElementById('cardTarget').textContent = endYear;
-        document.getElementById('lblNominal').textContent = `Nominal Balance (${endYear})`;
+        document.getElementById('cardTarget').textContent = endLabel;
+        document.getElementById('lblNominal').textContent = `Nominal Balance (${endLabel})`;
         document.getElementById('cardNetRate').textContent = netRatePct.toFixed(2) + '%';
         document.getElementById('cardNominal').textContent = formatCurrency(finalNominal);
         document.getElementById('cardReal').textContent = formatCurrency(finalReal);
@@ -834,10 +865,13 @@
                 generatedDate: new Date().toISOString().split('T')[0],
                 currency: 'AUD',
                 targetYear: endYear,
+                targetMonth: sim.endIdx % 12 + 1,
                 targetAge: retireAge
             },
             inputParameters: {
                 startYear,
+                startMonth,
+                birthMonth,
                 startAge,
                 retirementAge: retireAge,
                 startingBalance: initial,
@@ -863,6 +897,7 @@
             },
             yearlyProjections: sim.rows.map(r => ({
                 year: r.year,
+                month: r.month,
                 age: r.age,
                 isContributing: r.yr >= 1 && r.yr <= contribYears,
                 salary: round2(r.salary),
@@ -927,6 +962,7 @@
             ]),
             ...section('Limitations that affect the result', [
                 'Caps and thresholds are not indexed, so in later years the result will differ from real rules, and benefits tied to income thresholds are understated for people whose pay rises.',
+                'Time runs month by month from the start month. Retirement falls in your birth month of the retirement age, and the last year is part-year if that is not 12 months after the start. Salary growth and the contribution amounts step up every 12 months from the start month, not on 1 July.',
                 'Contributions, salary growth and returns are smooth. Real markets are volatile and the order of returns matters.',
                 'Not included: the Age Pension, tax on withdrawals, carry-forward of unused concessional cap, insurance premiums, spouse contributions, and changes to the law.',
                 'The government co-contribution is credited in the year of the contribution. In practice it is paid after your tax return is assessed, and other eligibility conditions apply.',
@@ -939,7 +975,9 @@
     // Maps control id -> key inside "inputParameters" of the downloaded JSON.
     const IMPORT_KEYS = {
         startYear:    'startYear',
+        startMonth:   'startMonth',
         startAge:     'startAge',
+        birthMonth:   'birthMonth',
         retireAge:    'retirementAge',
         initial:      'startingBalance',
         salary:       'annualSalary',
@@ -1000,7 +1038,9 @@
                 setImportStatus('Import failed: the file is not valid JSON.', true);
                 return;
             }
-            const params = data && typeof data === 'object' ? data.inputParameters : null;
+            let params = data && typeof data === 'object' ? data.inputParameters : null;
+            // A file downloaded from the combined calculator keeps this calculator's fields under "super"
+            if (params && typeof params.super === 'object' && params.super) params = params.super;
             if (!params || typeof params !== 'object') {
                 setImportStatus('Import failed: no input parameters found in this file.', true);
                 return;
